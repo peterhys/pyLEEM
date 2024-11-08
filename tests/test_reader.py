@@ -1,6 +1,7 @@
 import pytest
 from pyleem.reader import RawReader
 from datetime import datetime
+import numpy as np
 
 
 @pytest.fixture
@@ -27,19 +28,29 @@ def metadat_bytes(header_bytes):
 
 
 @pytest.fixture
-def reader(tmp_path, metadat_bytes):
+def img_array():
+    """Create an example image array."""
+
+    return np.random.rand(256, 128).astype(np.uint16)
+
+
+@pytest.fixture
+def reader(tmp_path, metadat_bytes, img_array):
     """Create a raw file.
 
     The raw data has lenght of 2332 bytes.
     """
     raw_file = tmp_path / "test.raw"
-    # append longer
-    raw_file.write_bytes(metadat_bytes + b"\xff" * 2000)
+    # append filler
+    # append image bytes
+    img_bytes = img_array.tobytes()
+    raw_file.write_bytes(metadat_bytes + b"\xff" * 2000 + img_bytes)
+
     user_tags = {
         104: [("expo", "<f", "s"), ("avg", "<Bc", "")],
         228: [("X", "<f", "m"), ("Y", "<f", "m")],
     }
-    return RawReader(raw_file, metasize=2500, user_tags=user_tags)
+    return RawReader(raw_file, metasize=2500, user_tags=user_tags, read_img=True)
 
 
 @pytest.fixture
@@ -105,3 +116,21 @@ def test_list_metadata(reader, img_metadata_parsed):
     """Test metadata keys."""
 
     assert sorted(reader.list_metadata()) == sorted(list(img_metadata_parsed.keys()))
+
+
+def test_image_array(reader, img_array):
+    """Test the image array."""
+
+    assert np.array_equal(reader.img, img_array)
+
+
+def test_image_false(tmp_path, metadat_bytes):
+    """Test the image array if img_read is False."""
+
+    raw_file = tmp_path / "test.raw"
+    # append filler
+    raw_file.write_bytes(metadat_bytes + b"\xff" * 2000)
+
+    reader = RawReader(raw_file, metasize=2000, read_img=False)
+
+    assert reader.img is None
