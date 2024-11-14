@@ -1,5 +1,6 @@
 from pyleem.metadata import get_header, get_imgmeta_index, get_imgmeta
 import numpy as np
+import pandas as pd
 
 
 class RawReader:
@@ -14,8 +15,9 @@ class RawReader:
         # file metadata added to attributes
         self.__dict__.update(self.header)
         self.imgmeta_slice = get_imgmeta_index(self.header)
-        self.imgmeta = get_imgmeta(
-            self.metabytes[self.imgmeta_slice], user_tags=user_tags
+        self.imgmeta = get_imgmeta(self.metabytes[self.imgmeta_slice], user_tags)
+        self.imgmeta_df = pd.DataFrame.from_dict(
+            self.imgmeta, orient="index", columns=["value", "unit", "tag"]
         )
 
         if read_img:

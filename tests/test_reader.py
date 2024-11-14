@@ -87,6 +87,13 @@ def test_imgmeta(reader, img_metadata_parsed):
 
     assert reader.imgmeta == img_metadata_parsed
 
+def test_imgmeta_df(reader):
+    """Test the image metadata dataframe."""
+
+    assert reader.imgmeta_df.loc["AL", "value"] == "Invalid"
+    assert reader.imgmeta_df.loc["avg", "unit"] == ""
+    assert reader.imgmeta_df.loc["ME", "tag"] == 190
+
 
 def test_subset_value(reader):
 
