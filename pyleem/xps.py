@@ -2,16 +2,19 @@
 
 import skimage.measure
 import numpy as np
-from lmfit.models import VoigtModel, PseudoVoigtModel
+from lmfit.models import PseudoVoigtModel
 from lmfit import Parameters
 import pandas as pd
 from pyleem import RawReader
 import skimage
 from roifile import ImagejRoi, ROI_TYPE
 from dataclasses import dataclass, field
+import re
+import os
+from itertools import zip_longest
 
 
-def shirley_substract(y, dx, base_diff, iterations=20, tol=1e-6):
+def shirley_background(y, dx, base_diff, iterations=20, tol=1e-6):
     """Shirley background calculation.
 
     The following code is modified based on the code from Kane O'Donnell.
@@ -52,7 +55,7 @@ def shirley_substract(y, dx, base_diff, iterations=20, tol=1e-6):
     return bg
 
 
-def xps_model(peaks, constraints=None):
+def pseudo_voigt_fits(peaks, constraints=None):
     """Create XPS model for XPS fitting.
 
     :param list peaks: The list of peaks to fit. The peak should be a string.
@@ -64,7 +67,6 @@ def xps_model(peaks, constraints=None):
 
     for pk in peaks:
         model_list.append(PseudoVoigtModel(prefix=pk + "_"))
-        # model_list.append(VoigtModel(prefix=pk + "_"))
 
     model = np.sum(model_list)
 
@@ -86,7 +88,7 @@ def plot_xps_fits(
     res_ax,
     x,
     y,
-    bg_total,
+    bg,
     result,
     title="",
     xlabel="Binding Energy [eV]",
@@ -103,17 +105,16 @@ def plot_xps_fits(
     :param result: The result of the fitting.
     :param str title: The title of the plot.
     """
-    ax.plot(x, y, label="XPS data")
-    ax.plot(x, result.best_fit + bg_total, label="total fit")
-    ax.plot(x, bg_total, label="bg")
+    ax.plot(x, y, label="experimental data")
+    ax.plot(x, result.best_fit + bg, label="total fit")
+    ax.plot(x, bg, label="background")
     for prefix, fit_array in result.eval_components().items():
-        ax.plot(x, fit_array + bg_total, label=f"{prefix}fit")
+        ax.plot(x, fit_array + bg, label=f"{prefix}fit")
     ax.set_title(title)
     ax.legend()
 
     ax.set_ylabel("Intensity")
     res_ax.set_ylabel("Residuals")
-    # res_ax.plot(x, y - result.best_fit - bg_total, label="residuals")
     res_ax.plot(x, result.residual, label="residuals")
     res_ax.set_xlabel(xlabel)
 
@@ -122,13 +123,16 @@ def plot_xps_fits(
         res_ax.invert_xaxis()
 
 
-def output_fit_result(results, area=False, uncertainty=True):
+def df_fit_result(results, area=False, uncertainty=True):
     """Output the fitting results.
 
     :param results: The fitting results.
+    :param bool area: If True, then calculate the area of the peak.
+    :param bool uncertainty: If True, then include the uncertainty in the fitting.
     """
     report_list = []
     for label, r in results:
+
         report_dict = {"Sample": label}
         if hasattr(r, "uvars") and uncertainty:
             report_dict.update(r.uvars)
@@ -152,48 +156,14 @@ def output_fit_result(results, area=False, uncertainty=True):
     return report_df
 
 
-def shift_KE(start_voltage, peak_shift, rel_ke):
-    """Adjust KE peak position."""
-
-    return start_voltage + peak_shift + rel_ke
-
-
-def read_xps(file, pixperev, incident_voltage, start_voltage, peak_shift):
-    """Read XPS data and plot it.
-
-    This function supports two different types of csv file style.
-    The plot profile directly from ImageJ that contains header but incorrect;
-    And the data exported using the ROIProfile plugin in ImageJ.
-    """
-
-    df = pd.read_csv(file, header=0)
-    # print(df)
-    # drop unnamed column
-    # sometimes ImageJ settings contains row number
-    # disable in ImageJ options > I/O > Save row numbers
-    # df.drop(
-    #     df.columns[df.columns.str.contains("unnamed", case=False)], axis=1, inplace=True
-    # )
-    # df.drop(
-    #     df.columns[df.columns.str==""], axis=1, inplace=True
-    # )
-    df.columns = ["pixel", "intensity"]
-    df["KE"] = start_voltage + peak_shift + df["pixel"] / pixperev
-    df["BE"] = incident_voltage - df["KE"]
-    return df
-
-
-import re
-import os
-from itertools import zip_longest
-
-file_format = re.compile(
+FILE_FORMAT = re.compile(
     # 20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s_C
     # position is optional
+    # regex returns None if position is not present
     r"(\d{8})_XPS_Sample(\d)_([A-Z]{1,2})_(\d[A-Z]{2})_"
     r"(\d{1,4})eV_(\d{1,4})eV_([A-Za-z]{1,2}\d[a-z])_?([A-Z]\d{0,1})?"
 )
-file_keys = [
+FILE_KEYS = [
     "date",
     "sample",
     "condition",
@@ -205,33 +175,55 @@ file_keys = [
 ]
 
 
-def parse_file_info(file, file_format, file_keys):
+def parse_filename(file, file_format=FILE_FORMAT, file_keys=FILE_KEYS):
+    """Parse the filename based on the file format.
+
+    Currently, some experiment metadata is encoded in the filename.
+    """
     basefile = os.path.basename(file)
     match = file_format.match(basefile)
     if match:
-        return zip_longest(file_keys, match.groups(), fillvalue="NA")
+        return dict(zip_longest(file_keys, match.groups()))
     else:
         raise ValueError(f"File name {file} does not match the expected format")
+
+
+def read_profile(file, pixperev, incident_voltage, start_voltage, peak_shift):
+    """Read XPS profile data.
+
+    This function supports two different types of csv file style.
+    The plot profile directly from ImageJ.
+    And the data exported using the ROIProfile plugin in ImageJ.
+    If more than two columns are detected, then only grab the last
+    two columns.
+    """
+
+    df = pd.read_csv(file, header=0)
+    if df.shape[1] > 2:
+        df = df.iloc[:, -2:]
+    df.columns = ["pixel", "intensity"]
+    df["kinetic energy"] = start_voltage + peak_shift + df["pixel"] / pixperev
+    df["binding energy"] = incident_voltage - df["kinetic energy"]
+    return df
 
 
 def profile_roi(image, roi, pixel_per_ev, incident_voltage, start_voltage, peak_shift):
     """Profile the image based on the ROI object."""
 
     profile = skimage.measure.profile_line(image, **roi)
-    KE = (start_voltage + peak_shift + df["pixel"] / pixel_per_ev,)
+    ke = start_voltage + peak_shift + profile / pixel_per_ev
     df = pd.DataFrame(
         {
             "intensity": profile,
             "pixel": np.arange(len(profile)),
-            "kinetic energy": KE,
-            "binding energy": incident_voltage - KE,
+            "kinetic energy": ke,
+            "binding energy": incident_voltage - ke,
         }
     )
 
     return df
 
 
-@dataclass
 class LineROI:
     """Region of interest for a line.
 
@@ -243,6 +235,9 @@ class LineROI:
         """Initialize the ROI object.
 
         If a roi file is pass then the parameters are loaded onto the file.
+        In the default figure orientation, the x-axis ascends from left to right,
+        and the y-axis ascends from top to bottom. The origin is at the top-left corner.
+
         """
 
         if file:
@@ -264,7 +259,6 @@ class LineROI:
         """Save the ROI to a file."""
 
         roif = ImagejRoi(
-            type="line",
             x1=self.src[1],
             y1=self.src[0],
             x2=self.dst[1],
