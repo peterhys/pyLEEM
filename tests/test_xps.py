@@ -2,7 +2,9 @@ import pytest
 import numpy as np
 import pandas as pd
 import scipy
-
+from roifile import ImagejRoi, ROI_TYPE
+from pyleem.roi import LineROI
+import h5py
 from pyleem.xps import (
     shirley_background,
     pseudo_voigt_fits,
@@ -11,13 +13,11 @@ from pyleem.xps import (
     read_profile,
     parse_filename,
     profile_roi,
-    LineROI,
+    XPSReader,
 )
 from lmfit import Parameters
 from lmfit.minimizer import MinimizerResult
-from lmfit.model import ModelResult
 from lmfit.models import PseudoVoigtModel
-from roifile import ImagejRoi, ROI_TYPE
 import matplotlib.pyplot as plt
 
 
@@ -157,8 +157,8 @@ def test_read_profile(tmp_path):
     data2 = ",pixel,intensity\n0, 0,10\n1, 1,20\n2, 2,30"
     file2.write_text(data2)
 
-    df1 = read_profile(file1, 5, 20.0, 10.0, 5.0)
-    df2 = read_profile(file2, 5, 20.0, 10.0, 5.0)
+    df1 = read_profile(file1, 20.0, 10.0, 5, 5.0)
+    df2 = read_profile(file2, 20.0, 10.0, 5, 5.0)
 
     assert df1.equals(df2)
     assert df1["pixel"].tolist() == [0, 1, 2]
@@ -171,14 +171,15 @@ def test_parse_filename():
     """Test parse_filename function."""
 
     # Test with a valid filename
-    filename = "20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s_C"
+    filename = "20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s_C.dat"
     expected_output = [
+        ("filename", "20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s_C.dat"),
         ("date", "20240101"),
         ("sample", "1"),
         ("condition", "E"),
         ("aperture", "1FA"),
-        ("incident_voltage", "700"),
-        ("start_voltage", "412"),
+        ("incident_voltage", 700),
+        ("start_voltage", 412),
         ("element", "C1s"),
         ("position", "C"),
     ]
@@ -186,16 +187,17 @@ def test_parse_filename():
     assert parsed_output == dict(expected_output)
 
     # Test with a filename missing the optional position
-    filename = "20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s"
+    filename = "20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s.dat"
     expected_output = [
+        ("filename", "20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s.dat"),
         ("date", "20240101"),
         ("sample", "1"),
         ("condition", "E"),
         ("aperture", "1FA"),
-        ("incident_voltage", "700"),
-        ("start_voltage", "412"),
+        ("incident_voltage", 700),
+        ("start_voltage", 412),
         ("element", "C1s"),
-        ("position", None),
+        ("position", "None"),
     ]
     parsed_output = parse_filename(filename)
     assert parsed_output == dict(expected_output)
@@ -277,7 +279,7 @@ def test_profile_roi():
         "reduce_func": np.mean,
     }
 
-    df = profile_roi(image, roi_horiz, 1, 0, 0, 0)
+    df = profile_roi(image, roi_horiz, 0, 0, 1, 0)
 
     assert df.shape == (13, 4)
     assert np.array_equal(df["pixel"], np.arange(13))
@@ -301,7 +303,7 @@ def test_profile_roi():
     peak_shift = 0.0
 
     df = profile_roi(
-        image, roi_diag, pixel_per_ev, incident_voltage, start_voltage, peak_shift
+        image, roi_diag, incident_voltage, start_voltage, pixel_per_ev, peak_shift
     )
 
     assert df.shape == (
@@ -313,15 +315,13 @@ def test_profile_roi():
 
     assert np.allclose(
         df["kinetic energy"],
-        start_voltage + peak_shift + df["intensity"] / pixel_per_ev,
+        start_voltage + peak_shift + df["pixel"] / pixel_per_ev,
     )
     assert np.allclose(df["binding energy"], incident_voltage - df["kinetic energy"])
 
 
-def test_line_roi(tmp_path):
-    """Test LineROI class."""
-
-    # Test initialization with file
+@pytest.fixture
+def roi(tmp_path):
     roi_file = tmp_path / "test.roi"
     roif = ImagejRoi(
         x1=0,
@@ -333,29 +333,74 @@ def test_line_roi(tmp_path):
         roitype=ROI_TYPE.LINE,
     )
     roif.tofile(roi_file)
-    roi = LineROI(file=roi_file, linewidth=10)
 
-    assert roi.src == (0, 0)
-    assert roi.dst == (9, 9)
-    assert roi.linewidth == 10
-    assert roi.order == 1
-    assert roi.mode == "nearest"
-    assert roi.cval == 0
-    assert roi.reduce_func == np.mean
+    # Initialize the XPSReader
+    roi = LineROI(file=roi_file, linewidth=1)
+    return roi
 
-    # Test initialization with kwargs
-    roi = LineROI(src=(0, 0), dst=(9, 9), linewidth=1)
-    assert roi.src == (0, 0)
-    assert roi.dst == (9, 9)
-    assert roi.linewidth == 1
 
-    # Test tofile method
-    roi_file_out = tmp_path / "test_out.roi"
-    roi.tofile(roi_file_out)
-    roif_out = ImagejRoi.fromfile(roi_file_out)
-    assert roif_out.x1 == 0
-    assert roif_out.y1 == 0
-    assert roif_out.x2 == 9
-    assert roif_out.y2 == 9
-    assert roif_out.stroke_width == 1
-    assert roif_out.roitype == ROI_TYPE.LINE
+@pytest.fixture
+def xps_reader(tmp_path, img_array, metadata_bytes, roi):
+    """Fixture for the XPSReader isntance."""
+    # Create a temporary ROI file
+
+    pixel_per_ev = 1.0
+    peak_shift = 0.0
+
+    raw_file = tmp_path / "20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s_C.dat"
+    # append filler
+    # append image bytes
+
+    img_bytes = img_array.tobytes()
+    raw_file.write_bytes(metadata_bytes + b"\xff" * 2000 + img_bytes)
+
+    reader = XPSReader(raw_file.as_posix(), roi, pixel_per_ev, peak_shift)
+    return reader
+
+
+def test_XPSReader(roi, img_array, xps_reader):
+    """Test the XPSReader class."""
+
+    pixel_per_ev = 1.0
+    peak_shift = 0.0
+    # Check the file_info attribute
+    expected_file_info = {
+        "filename": xps_reader.path,
+        "date": "20240101",
+        "sample": "1",
+        "condition": "E",
+        "aperture": "1FA",
+        "incident_voltage": 700.0,
+        "start_voltage": 412.0,
+        "element": "C1s",
+        "position": "C",
+    }
+    assert xps_reader.info == expected_file_info
+
+    # Check the roi attribute
+    assert xps_reader.roi == roi
+
+    # Check the profile attribute
+    expected_profile = profile_roi(img_array, roi, 700, 412, pixel_per_ev, peak_shift)
+    pd.testing.assert_frame_equal(xps_reader.profile, expected_profile)
+
+
+def test_custom_h5(tmp_path, xps_reader):
+    """Test the writing of the reader to a HDF5 file."""
+
+    h5_file = tmp_path / "test.h5"
+    with h5py.File(h5_file, "w") as f:
+        xps_reader.to_h5(f, write_img=True)
+
+    with h5py.File(h5_file, "r") as f:
+        assert np.array_equal(
+            f["20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s_C"]["profile"]["intensity"],
+            xps_reader.profile["intensity"],
+        )
+        assert np.array_equal(
+            f["20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s_C"]["profile"][
+                "binding energy"
+            ],
+            xps_reader.profile["binding energy"],
+        )
+        assert "roi" in f["20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s_C"]["profile"]

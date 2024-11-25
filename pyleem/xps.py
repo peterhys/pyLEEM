@@ -3,15 +3,13 @@
 import skimage.measure
 import numpy as np
 from lmfit.models import PseudoVoigtModel
-from lmfit import Parameters
 import pandas as pd
 from pyleem import RawReader
 import skimage
-from roifile import ImagejRoi, ROI_TYPE
-from dataclasses import dataclass, field
 import re
 import os
 from itertools import zip_longest
+from pyleem.reader import RawReader
 
 
 def shirley_background(y, dx, base_diff, iterations=20, tol=1e-6):
@@ -164,14 +162,14 @@ FILE_FORMAT = re.compile(
     r"(\d{1,4})eV_(\d{1,4})eV_([A-Za-z]{1,2}\d[a-z])_?([A-Z]\d{0,1})?"
 )
 FILE_KEYS = [
-    "date",
-    "sample",
-    "condition",
-    "aperture",
-    "incident_voltage",
-    "start_voltage",
-    "element",
-    "position",  # optional
+    ("date", str),
+    ("sample", str),
+    ("condition", str),
+    ("aperture", str),
+    ("incident_voltage", float),
+    ("start_voltage", float),
+    ("element", str),
+    ("position", str),  # optional
 ]
 
 
@@ -183,12 +181,15 @@ def parse_filename(file, file_format=FILE_FORMAT, file_keys=FILE_KEYS):
     basefile = os.path.basename(file)
     match = file_format.match(basefile)
     if match:
-        return dict(zip_longest(file_keys, match.groups()))
+        file_info = {"filename": file}
+        for (key, tp), value in zip_longest(file_keys, match.groups()):
+            file_info[key] = tp(value)
+        return file_info
     else:
         raise ValueError(f"File name {file} does not match the expected format")
 
 
-def read_profile(file, pixperev, incident_voltage, start_voltage, peak_shift):
+def read_profile(file, incident_voltage, start_voltage, pixperev, peak_shift):
     """Read XPS profile data.
 
     This function supports two different types of csv file style.
@@ -207,11 +208,12 @@ def read_profile(file, pixperev, incident_voltage, start_voltage, peak_shift):
     return df
 
 
-def profile_roi(image, roi, pixel_per_ev, incident_voltage, start_voltage, peak_shift):
+def profile_roi(image, roi, incident_voltage, start_voltage, pixel_per_ev, peak_shift):
     """Profile the image based on the ROI object."""
 
     profile = skimage.measure.profile_line(image, **roi)
-    ke = start_voltage + peak_shift + profile / pixel_per_ev
+    pixel = np.arange(len(profile))
+    ke = start_voltage + peak_shift + pixel / pixel_per_ev
     df = pd.DataFrame(
         {
             "intensity": profile,
@@ -224,47 +226,59 @@ def profile_roi(image, roi, pixel_per_ev, incident_voltage, start_voltage, peak_
     return df
 
 
-class LineROI:
-    """Region of interest for a line.
+class XPSReader(RawReader):
+    """Read XPS specific LEEM raw data.
 
-    ROI parameters can be directly passed to the constructor, or a ROI file from
-    ImageJ.
+    The class reads the raw data, parses filename,
+    and profile the XPS data. Currently it does not allow
+    custom tags.
+
+    For file that is not the standard foramt, use a custom
+    file function for parse_func. The parsed dictionary
+    has to have "incident_voltage" and "start_voltage" keys.
+
+    TODO:
+        - Consider check the start voltage against metadata.
+
     """
 
-    def __init__(self, file=None, **kwargs):
-        """Initialize the ROI object.
+    def __init__(self, path, roi, pixel_per_ev, peak_shift, parse_func=parse_filename):
+        super().__init__(path)
+        self.info = parse_func(path)
+        self.roi = roi
 
-        If a roi file is pass then the parameters are loaded onto the file.
-        In the default figure orientation, the x-axis ascends from left to right,
-        and the y-axis ascends from top to bottom. The origin is at the top-left corner.
+        # by default the start voltage is based on the filename
+        # assert self.file_info["start_voltage"] == self.imgmeta['Start Voltage'][0]
 
+        self.profile = profile_roi(
+            self.read_image(),
+            roi,
+            self.info["incident_voltage"],
+            self.info["start_voltage"],
+            pixel_per_ev,
+            peak_shift,
+        )
+
+    def custom_h5(self, group):
+        """Add XPS specific metadata to the h5 group.
+
+        Create the profile group and add the roi and profile data.
+        The dimension is set to be the binding energy.
         """
 
-        if file:
-            roif = ImagejRoi.fromfile(file)
-            self.src = (roif.y1, roif.x1)
-            self.dst = (roif.y2, roif.x2)
-            self.linewidth = roif.stroke_width
-
-        else:
-            assert "src" in kwargs and "dst" in kwargs and "linewidth" in kwargs
-        self.order = 1
-        self.mode = "nearest"
-        self.cval = 0
-        self.reduce_func = np.mean
-
-        self.__dict__.update(kwargs)
-
-    def tofile(self, file):
-        """Save the ROI to a file."""
-
-        roif = ImagejRoi(
-            x1=self.src[1],
-            y1=self.src[0],
-            x2=self.dst[1],
-            y2=self.dst[0],
-            stroke_width=self.linewidth,
-            stroke_color=b"M\xff\xff\x00",  # default yellow
-            roitype=ROI_TYPE.LINE,
+        group.attrs.update({k: v for k, v in self.info.items() if v})
+        profile_group = group.create_group("profile")
+        intensity = profile_group.create_dataset(
+            "intensity", data=self.profile["intensity"]
         )
-        roif.tofile(file)
+
+        be = profile_group.create_dataset(
+            "binding energy", data=self.profile["binding energy"]
+        )
+        be.attrs["unit"] = "eV"
+        be.make_scale()
+
+        intensity.dims[0].label = "binding energy"
+        intensity.dims[0].attach_scale(be)
+
+        self.roi.to_h5(profile_group)

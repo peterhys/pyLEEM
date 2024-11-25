@@ -1,50 +1,15 @@
 import pytest
 from pyleem.reader import RawReader
-from datetime import datetime
 import numpy as np
+import h5py
 
 
 @pytest.fixture
-def metadat_bytes(header_bytes):
-    """Create an example metadata bytes."""
-
-    empty_1 = b"\xff" * 240
-
-    marker = (
-        b"\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x04"
-        b"\x00\x00\x80\x00\x00\x00\x03\x00\xce\x02\xc7\x03'\x01e\x00$\x01\n\x00"
-    )
-    empty_2 = b"\x00" * 110
-
-    img_header = (
-        b"\xd2ALE1\x00\x00\x00\x00C\xcbAL2\x00sO\xc3G"
-        b"h\x00\x00\x00C\x10\x01"
-        b"\xecECH\x00MTorr\x00\x00\x00\x00C"
-        b"\xe4\x00\x00\x00C\x00\x00\x00C\xbeME5\x00\xf3O\xc3G"
-        b"nXPS\x00\x00\x00\x80Eq\x00\x00\x00\x00\xff\xff"
-    )
-
-    return header_bytes + empty_1 + marker + empty_2 + img_header
-
-
-@pytest.fixture
-def img_array():
-    """Create an example image array."""
-
-    return np.random.rand(256, 128).astype(np.uint16)
-
-
-@pytest.fixture
-def reader(tmp_path, metadat_bytes, img_array):
-    """Create a raw file.
+def reader(raw_file):
+    """Create a reader from a raw file.
 
     The raw data has lenght of 2332 bytes.
     """
-    raw_file = tmp_path / "test.raw"
-    # append filler
-    # append image bytes
-    img_bytes = img_array.tobytes()
-    raw_file.write_bytes(metadat_bytes + b"\xff" * 2000 + img_bytes)
 
     user_tags = {
         104: [("expo", "<f", "s"), ("avg", "<Bc", "")],
@@ -87,6 +52,7 @@ def test_imgmeta(reader, img_metadata_parsed):
 
     assert reader.imgmeta == img_metadata_parsed
 
+
 def test_imgmeta_df(reader):
     """Test the image metadata dataframe."""
 
@@ -95,22 +61,18 @@ def test_imgmeta_df(reader):
     assert reader.imgmeta_df.loc["ME", "tag"] == 190
 
 
-def test_subset_value(reader):
+def test_subset_values(reader):
 
-    values = reader.subset_value(["ALE", "AL", "ME"])
-    assert values == {
-        "ALE": 128.0,
-        "AL": "Invalid",
-        "ME": "Local",
-    }
+    values = reader.subset_values(["ALE", "AL", "ME"])
+    assert values == [128.0, "Invalid", "Local"]
 
 
-def test_subset_unit(reader):
+def test_subset_units(reader):
     """Test extract the units."""
 
     keys = ["ALE", "AL", "ME"]
-    units = reader.subset_unit(keys)
-    assert units == {"ALE": "V", "AL": "mA", "ME": "K"}
+    units = reader.subset_units(keys)
+    assert units == ["V", "mA", "K"]
 
 
 def test_list_headers(reader, header_parsed):
@@ -131,13 +93,82 @@ def test_image_array(reader, img_array):
     assert np.array_equal(reader.img, img_array)
 
 
-def test_image_false(tmp_path, metadat_bytes):
+def test_image_false(tmp_path, metadata_bytes):
     """Test the image array if img_read is False."""
 
     raw_file = tmp_path / "test.raw"
     # append filler
-    raw_file.write_bytes(metadat_bytes + b"\xff" * 2000)
+    raw_file.write_bytes(metadata_bytes + b"\xff" * 2000)
 
     reader = RawReader(raw_file, metasize=2000, read_img=False)
 
     assert reader.img is None
+
+
+def test_comparison_less_than(tmp_path, metadata_bytes):
+    """Test the equality comparison of RawReader instances."""
+    raw_file1 = tmp_path / "test_equal_01.raw"
+    raw_file1.write_bytes(metadata_bytes + b"\xff" * 2000)
+
+    reader1 = RawReader(raw_file1, metasize=2500, read_img=False)
+
+    raw_file2 = tmp_path / "test_equal_02.raw"
+    raw_file2.write_bytes(metadata_bytes + b"\xff" * 2000)
+
+    reader2 = RawReader(raw_file2, metasize=2500, read_img=False)
+
+    assert reader1 < reader2
+
+
+def test_repr(reader, raw_file):
+    """Test the representation of the reader."""
+
+    assert repr(reader) == f"RawReader({raw_file})"
+
+
+def test_to_h5(reader, tmp_path):
+    """Test the writing of the reader to a HDF5 file."""
+
+    h5_file = tmp_path / "test.h5"
+    with h5py.File(h5_file.as_posix(), "w") as f:
+        reader.to_h5(f, write_img=True)
+
+    with h5py.File(h5_file, "r") as f:
+        group = f["test"]
+        assert group.attrs["timestamp"] == reader.header["timestamp"]
+        assert "image" in group
+        assert np.array_equal(group["image"], reader.img)
+
+        for key, value in reader.imgmeta.items():
+            assert group["image"].attrs[key] == value[0]
+            assert group["image"].attrs[key + "_unit"] == value[1]
+
+    with h5py.File(h5_file.as_posix(), "w") as f:
+        reader.to_h5(f, write_img=False)
+
+    with h5py.File(h5_file, "r") as f:
+        group = f["test"]
+        assert "image" in group
+        assert not np.array_equal(group["image"], reader.img)
+
+        for key, value in reader.imgmeta.items():
+            assert group["image"].attrs[key] == value[0]
+            assert group["image"].attrs[key + "_unit"] == value[1]
+
+
+def test_custom_h5(tmp_path, raw_file):
+    """Test the custom HDF5 method."""
+
+    h5_file = tmp_path / "test.h5"
+
+    class CustomReader(RawReader):
+        def custom_h5(self, group):
+            group.attrs.update({"custom": "custom"})
+
+    reader = CustomReader(raw_file, metasize=2500, read_img=False)
+    with h5py.File(h5_file, "w") as f:
+        reader.to_h5(f)
+
+    with h5py.File(h5_file, "r") as f:
+        group = f["test"]
+        assert group.attrs["custom"] == "custom"

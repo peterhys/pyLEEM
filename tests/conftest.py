@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime
 import struct
+import numpy as np
 
 
 @pytest.fixture
@@ -57,7 +58,7 @@ def header_parsed():
         "img_version": 7,
         "colorscale_low": 1,
         "colorscale_high": 443,
-        "timestamp": datetime(5678, 4, 4, 15, 3, 12, 372681),
+        "timestamp": "5678/04/04 15:03:12",
         "mask_xshift": 256,
         "mask_yshift": 0,
         "usemask": 0,
@@ -66,3 +67,48 @@ def header_parsed():
         "spin": 0,
         "img_meta_size": 2000,
     }
+
+
+@pytest.fixture
+def metadata_bytes(header_bytes):
+    """Create an example metadata bytes."""
+
+    empty_1 = b"\xff" * 240
+
+    marker = (
+        b"\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x04"
+        b"\x00\x00\x80\x00\x00\x00\x03\x00\xce\x02\xc7\x03'\x01e\x00$\x01\n\x00"
+    )
+    empty_2 = b"\x00" * 110
+
+    img_header = (
+        b"\xd2ALE1\x00\x00\x00\x00C\xcbAL2\x00sO\xc3G"
+        b"h\x00\x00\x00C\x10\x01"
+        b"\xecECH\x00MTorr\x00\x00\x00\x00C"
+        b"\xe4\x00\x00\x00C\x00\x00\x00C\xbeME5\x00\xf3O\xc3G"
+        b"nXPS\x00\x00\x00\x80Eq\x00\x00\x00\x00\xff\xff"
+    )
+
+    return header_bytes + empty_1 + marker + empty_2 + img_header
+
+
+@pytest.fixture
+def img_array():
+    """Create an example image array."""
+
+    return np.random.rand(256, 128).astype(np.uint16)
+
+
+@pytest.fixture
+def raw_file(tmp_path, metadata_bytes, img_array):
+    """Create a raw file.
+
+    The raw data has lenght of 2332 bytes.
+    """
+    raw_file = tmp_path / "test.raw"
+    # append filler
+    # append image bytes
+    img_bytes = img_array.tobytes()
+    raw_file.write_bytes(metadata_bytes + b"\xff" * 2000 + img_bytes)
+
+    return raw_file

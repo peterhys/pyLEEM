@@ -5,8 +5,6 @@ from pyleem.metadata import (
     get_imgmeta_index,
 )
 import pytest
-from datetime import datetime
-import struct
 
 
 def test_get_header(header_bytes, header_parsed):
@@ -22,13 +20,7 @@ def test_convert_win_filetime():
     # Windows filetime for 2023-01-01 00:00:00
     win_time = 133170720000000000
     dt = convert_win_filetime(win_time)
-    assert isinstance(dt, datetime)
-    assert dt.year == 2023
-    assert dt.month == 1
-    assert dt.day == 1
-    assert dt.hour == 13
-    assert dt.minute == 40
-    assert dt.second == 0
+    assert dt == "2023/01/01 13:40:00"
 
 
 def test_get_imgmeta_index():

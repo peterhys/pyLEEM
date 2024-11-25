@@ -6,9 +6,7 @@ from pyleem.metainfo import (
     SPEC_TAGS,
     UNIT_DICT,
 )
-
 import logging
-
 import struct
 from datetime import datetime
 
@@ -17,10 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 def convert_win_filetime(timestamp):
-    """Convert windows filetime to unix epoch."""
+    """Convert windows filetime to unix epoch.
+
+    Returns a time string with the format of YYYY/MM/DD HH:MM:SS.
+    The string format is for saving to a HDF5 file.
+    """
 
     # 11644473600 is the difference between windows epoch and unix epoch
-    return datetime.fromtimestamp(timestamp / 1e7 - 11644473600)
+    return datetime.fromtimestamp(timestamp / 1e7 - 11644473600).strftime(
+        "%Y/%m/%d %H:%M:%S"
+    )
 
 
 def get_header(metabytes, file_info=FILE_INFO, img_info=IMG_INFO):
