@@ -7,7 +7,9 @@ import os
 class RawReader:
     """Read LEEM raw .dat file."""
 
-    def __init__(self, path, user_tags=None, metasize=16384, read_img=True):
+    def __init__(self, path, user_tags=None, metasize=16384, read_img=True, root_dir=None):
+        if root_dir:
+            path = os.path.join(root_dir, path)
         self.path = path
         self.metasize = metasize
         self.metabytes = self.read_metabytes(metasize)
