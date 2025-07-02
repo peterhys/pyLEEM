@@ -58,7 +58,7 @@ def header_parsed():
         "img_version": 7,
         "colorscale_low": 1,
         "colorscale_high": 443,
-        "timestamp": "5678/04/04 15:03:12",
+        "timestamp": "5678/04/04 15:03:12.372681",
         "mask_xshift": 256,
         "mask_yshift": 0,
         "usemask": 0,

@@ -20,7 +20,7 @@ def test_convert_win_filetime():
     # Windows filetime for 2023-01-01 00:00:00
     win_time = 133170720000000000
     dt = convert_win_filetime(win_time)
-    assert dt == "2023/01/01 13:40:00"
+    assert dt == "2023/01/01 13:40:00.000000"
 
 
 def test_get_imgmeta_index():

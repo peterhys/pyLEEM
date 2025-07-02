@@ -23,7 +23,7 @@ def convert_win_filetime(timestamp):
 
     # 11644473600 is the difference between windows epoch and unix epoch
     return datetime.fromtimestamp(timestamp / 1e7 - 11644473600).strftime(
-        "%Y/%m/%d %H:%M:%S"
+        "%Y/%m/%d %H:%M:%S.%f"
     )
 
 
