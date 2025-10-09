@@ -1,15 +1,19 @@
 """Functions for XPS analysis."""
 
-import skimage.measure
-import numpy as np
-from lmfit.models import PseudoVoigtModel
-import pandas as pd
-from pyleem import RawReader
-import skimage
 import re
 import os
+from lmfit.models import PseudoVoigtModel
+import numpy as np
+import pandas as pd
+
 from itertools import zip_longest
 from pyleem.reader import RawReader
+import scipy.signal
+import scipy.ndimage
+import skimage
+import skimage.measure
+import matplotlib.pyplot as plt
+from datetime import datetime
 
 
 def shirley_background(y, dx, base_diff, iterations=20, tol=1e-6):
@@ -282,3 +286,304 @@ class XPSReader(RawReader):
         intensity.dims[0].attach_scale(be)
 
         self.roi.to_h5(profile_group)
+
+
+def parameter_estimation(profile, num_peaks, peak_prominence=0.1):
+    """Vary crude way to estimate parameters for peak fitting."""
+    # find peaks
+    prominence = max(profile) * peak_prominence
+    peaks, _ = scipy.signal.find_peaks(profile, prominence=prominence)
+
+    while len(peaks) > num_peaks:
+
+        prominence = prominence * 1.5
+        peaks, _ = scipy.signal.find_peaks(profile, prominence=prominence)
+
+    # find peak widths
+    widths, width_heights, left_ips, right_ips = scipy.signal.peak_widths(
+        profile, peaks, rel_height=0.5
+    )
+
+    sigmas = np.array(widths) / 2
+    # peak area (by summation)
+    peak_areas = np.empty(len(peaks))
+    for i, p in enumerate(peaks):
+        peak_areas[i] = profile[
+            left_ips[i].astype(int) : right_ips[i].astype(int)
+        ].sum()
+
+    if len(peaks) < num_peaks:
+        if len(peaks) == 1:
+            peak = peaks[0]
+            peaks = np.array([peak - 0.1 * sigmas[0], peak + 0.1 * sigmas[0]])
+            sigmas = np.array([sigmas[0], sigmas[0]])
+            peak_areas = np.array([peak_areas[0] / 2, peak_areas[0] / 2])
+
+    return peaks, sigmas, peak_areas
+
+
+def plot_xps(
+    profiles,
+    results,
+    bgs,
+    titles,
+    x_axes=None,
+    xlabel="pixel",
+    inverted=True,
+):
+    """A even higher level of plotting."""
+
+    if x_axes is None:
+        x_axes = np.arange(len(profiles[0]))
+
+    nrows = len(profiles)
+    fig, axs = plt.subplots(
+        2, nrows, height_ratios=[2, 1], figsize=(10, 6), sharex="col", sharey="row"
+    )
+
+    if nrows == 1:
+        plot_xps_fits(
+            axs[0],
+            axs[1],
+            x_axes,
+            profiles[0],
+            bgs[0],
+            results[0],
+            xlabel=xlabel,
+            title=titles[0],
+        )
+        if inverted:
+            axs[0].invert_xaxis()
+    else:
+        for i, (profile, result, bg) in enumerate(zip(profiles, results, bgs)):
+            plot_xps_fits(
+                axs[0, i],
+                axs[1, i],
+                x_axes,
+                profile,
+                bg,
+                result,
+                xlabel=xlabel,
+                title=titles[i],
+            )
+
+
+def xps_fitting(
+    profile,
+    background_values=None,
+    background_indices=None,
+    num_peaks=1,
+    dx=1,
+    x_data=None,
+    fixed_fraction=True,
+    peak_prominence=0.1,
+):
+    """Semi automatic fitting of XPS data."""
+
+    background_indices = background_indices or (50, -50)
+    if background_values is None:
+        bg_left = profile[: background_indices[0]].mean()
+        bg_right = profile[background_indices[1] :].mean()
+    else:
+        bg_left, bg_right = background_values
+
+    if x_data is None:
+        x_data = np.arange(len(profile))
+
+    # background subtraction
+    bg = shirley_background(profile - bg_right, dx, bg_left - bg_right) + bg_right
+
+    # approximate parameters
+    profile_sub = profile - bg
+
+    centers, sigmas, peak_areas = parameter_estimation(
+        profile_sub, num_peaks, peak_prominence
+    )
+
+    constr = {}
+    for i in range(1, num_peaks + 1):  # start with 1
+        constr[f"p{i}_center"] = {"value": centers[i - 1]}
+        constr[f"p{i}_amplitude"] = {"value": peak_areas[i - 1]}
+        constr[f"p{i}_sigma"] = {"value": sigmas[i - 1]}
+
+    model, param = pseudo_voigt_fits([f"p{i}" for i in range(1, num_peaks + 1)], constr)
+    result = model.fit(profile_sub, x=x_data, params=param)
+
+    return result, bg
+
+
+def fit_pixel_per_ev(
+    files,
+    roi,
+    background_values,
+    num_peaks,
+    plot=False,
+    peak_prominence=0.1,
+    **kwargs,
+):
+
+    background_values = background_values.split(",")
+    background_values = np.array([float(f) for f in background_values]).reshape(-1, 2)
+
+    num_peaks = int(num_peaks)
+
+    xps_objs = [RawReader(f) for f in files]
+
+    profiles = [skimage.measure.profile_line(c.read_image(), **roi) for c in xps_objs]
+
+    results = []
+    bgs = []
+    for profile, background in zip(profiles, background_values):
+        result, bg = xps_fitting(
+            profile,
+            background_values=background,
+            num_peaks=num_peaks,
+            peak_prominence=peak_prominence,
+        )
+        results.append(result)
+        bgs.append(bg)
+
+    delta_ev = (
+        xps_objs[1].imgmeta["Start Voltage"][0]
+        - xps_objs[0].imgmeta["Start Voltage"][0]
+    )
+
+    peak_diff = []
+
+    for i in range(1, num_peaks + 1):
+        peak_diff.append(
+            results[1].best_values[f"p{i}_center"]
+            - results[0].best_values[f"p{i}_center"]
+        )
+    peak_diff = np.array(peak_diff).mean()
+
+    pixel_per_ev = peak_diff / -delta_ev
+    print(f"pixel_per_ev: {pixel_per_ev}")
+
+    if plot:
+        plot_xps(
+            profiles,
+            results,
+            bgs,
+            [
+                f"pixel_per_ev calibration start voltage: {obj.imgmeta['Start Voltage'][0]}"
+                for obj in xps_objs
+            ],
+            xlabel="pixel",
+        )
+
+    return pixel_per_ev
+
+
+def fit_peak_shift(
+    file,
+    roi,
+    background_values,
+    num_peaks,
+    peak_index,
+    pixel_per_ev,
+    peak_value,
+    incident_voltage,
+    plot=False,
+    peak_prominence=0.1,
+    **kwargs,
+):
+
+    background_values = background_values.split(",")
+    background_values = [float(f) for f in background_values]
+
+    num_peaks = int(num_peaks)
+    peak_index = int(peak_index)
+    peak_value = float(peak_value)
+    incident_voltage = float(incident_voltage)
+    peak_prominence = float(peak_prominence)
+
+    xps_obj = RawReader(file)
+    profile = skimage.measure.profile_line(xps_obj.read_image(), **roi)
+
+    result, bg = xps_fitting(
+        profile,
+        background_values=background_values,
+        num_peaks=num_peaks,
+        peak_prominence=peak_prominence,
+    )
+    start_voltage = xps_obj.imgmeta["Start Voltage"][0]
+
+    peak_pos = result.best_values[f"p{peak_index+1}_center"] / pixel_per_ev
+    peak_shift = incident_voltage - start_voltage - peak_value - peak_pos
+
+    if plot:
+        plot_xps(
+            [profile],
+            [result],
+            [bg],
+            [f"absolute ev calibration start voltage: {start_voltage}"],
+            x_axes=incident_voltage
+            - start_voltage
+            - np.arange(len(profile)) / pixel_per_ev
+            - peak_shift,
+            xlabel="binding energy [eV]",
+            inverted=True,
+        )
+
+    print(f"peak shift: {peak_shift}")
+
+    return peak_shift
+
+
+def plot_xps_data(
+    files,
+    ax,
+    title_prefix,
+    start_idx=0,
+    end_idx=None,
+    skip=10,
+    show_interval=True,
+    incident_voltage=700,
+    pixel_per_ev=166,
+    peak_shift=0,
+    **kwargs,
+):
+    """Plot XPS data from a list of files"""
+    files_subset = files[start_idx:end_idx] if end_idx else files[start_idx:]
+    color = plt.cm.Blues(np.linspace(0.2, 1.0, len(files_subset) // skip + 1))
+
+    t_list = []
+    for i, f in enumerate(files_subset):
+        if i % skip == 0:
+            r = RawReader(f)
+            r.read_image()
+            start_voltage = r.imgmeta["Start Voltage"][0]
+            exposure_time = r.imgmeta["Camera Exposure"][0]
+            camera_average = r.imgmeta["Camera Average"][0]
+            t_list.append(datetime.strptime(r.timestamp, "%Y/%m/%d %H:%M:%S.%f"))
+            profile = skimage.measure.profile_line(r.read_image(), **roi)
+            profile = scipy.ndimage.gaussian_filter1d(profile, sigma=20.0)
+            ev_range = incident_voltage - (
+                start_voltage + np.arange(len(profile)) / pixel_per_ev + peak_shift
+            )
+            ax.plot(ev_range, profile, color=color[i // skip])
+    ax.invert_xaxis()
+    if "ylim" in kwargs:
+        ax.set_ylim(kwargs["ylim"])
+    ax.set_xlabel("Binding Energy [eV]")
+
+    if show_interval:
+        exp_time = (t_list[-1] - t_list[0]).total_seconds()
+        ax.text(
+            0.02,
+            0.98,
+            f"{title_prefix} μXPS \nexp time: {exp_time:.2f} s\nevery {skip} frames",
+            transform=ax.transAxes,
+            verticalalignment="top",
+            horizontalalignment="left",
+        )
+    else:
+        ax.text(
+            0.02,
+            0.98,
+            f"start time: {t_list[0].strftime('%H:%M:%S')}\nend time: {t_list[-1].strftime('%H:%M:%S')}\nevery {skip} frames",
+            transform=ax.transAxes,
+            verticalalignment="top",
+            horizontalalignment="left",
+        )
