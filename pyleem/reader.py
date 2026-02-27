@@ -127,3 +127,91 @@ class UViewReader(Reader):
 
         if write_img:
             group.create_dataset("image", data=self.read_image(), compression="gzip")
+
+
+class H5Reader(Reader):
+    """Reader for HDF5 files created by UViewReader.
+
+    Loads LEEM data from the HDF5 format. 
+    :param str or Path path: Path to .h5 file.
+    :param str gname: Group name (uses first group if None).
+
+    :ivar Path path: Path to HDF5 file.
+    :ivar str gname: Group name containing data.
+    """
+
+    def __init__(self, path, gname=None):
+        self.path = path
+
+        with h5py.File(self.path, "r") as f:
+            if gname is None:
+                groups = list(f.keys())
+                if not groups:
+                    raise ValueError(f"No groups found in HDF5 file: {path}")
+                self.gname = groups[0]
+            else:
+                self.gname = gname
+
+            if self.gname not in f:
+                raise ValueError(f"Group '{self.gname}' not found in HDF5 file: {path}")
+
+
+        self._metadata = {}
+
+        with h5py.File(self.path, "r") as f:
+            group = f[self.gname]
+            attrs = dict(group.attrs)
+
+            # Separate regular and unit attributes
+            unit_attrs = {
+                k[:-5]: v for k, v in attrs.items() if k.endswith("_unit")
+            }
+
+            for key, value in attrs.items():
+                if not key.endswith("_unit"):
+                    unit = unit_attrs.get(key, None)
+                    self._metadata[key] = (value, unit)
+
+
+    @property
+    def metadata(self):
+        """Return metadata dictionary in (value, unit) format.
+
+        Metadata is reconstructed from HDF5 group attributes where
+        attributes ending in '_unit' are paired with parameter attributes.
+        """
+
+        return self._metadata
+
+    def read_image(self):
+        """Read image data from the HDF5 file."""
+
+        with h5py.File(self.path, "r") as f:
+            group = f[self.gname]
+            if "image" in group:
+                image = group["image"][:]
+            else:
+                return None
+
+        return image
+
+    def read_profile(self, roi):
+        """Extract profile data from the image.
+
+        :param dict or LineROI roi: Region of interest.
+        :return: Profile array.
+        :rtype: ndarray
+        """
+        img = self.read_image()
+        if img is None:
+            raise ValueError(f"No image data found in group '{self.gname}'")
+        return skimage.measure.profile_line(img, **roi)
+
+    def __lt__(self, other):
+        """Enable sorting by path and group name."""
+        if self.path != other.path:
+            return self.path < other.path
+        return self.gname < other.gname
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.path}, gname='{self.gname}')"
