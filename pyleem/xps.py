@@ -1,63 +1,65 @@
-"""Functions for XPS analysis."""
-
-import skimage.measure
-import numpy as np
 from lmfit.models import PseudoVoigtModel
-import pandas as pd
-from pyleem import RawReader
-import skimage
-import re
-import os
-from itertools import zip_longest
-from pyleem.reader import RawReader
+import numpy as np
+from pyleem.analysis import ProfileAnalyzer, AnalyzerGroup
+import scipy.signal
+import matplotlib.pyplot as plt
 
 
-def shirley_background(y, dx, base_diff, iterations=20, tol=1e-6):
-    """Shirley background calculation.
+def shirley_background(profile, base_diff, iterations=20, tol=1e-6):
+    """Calculate Shirley background for XPS spectra.
 
-    The following code is modified based on the code from Kane O'Donnell.
-    Here we modify the background subtraction to two steps:
-    1. Calculate the constant shift of the background.
-    2. Iteratively calculate the Shirley background.
+    Implements iterative Shirley algorithm for background subtraction.
+    Background at each point is proportional to integrated peak area
+    toward higher binding energy. Here we simply assume that the x
+    axis is in descending BE order.
 
-    Because of the noise, here
+    Modified from code by Kane O'Donnell.
 
-    :param ndarray dx: The step size of the x-axis.
-    :param ndarray y: The intensity of the peak, corresponding to the x.
-    :param float base_diff: The difference between the left and right base of the peak background.
-    :param int iterations: Th max number of iterations to perform.
+    :param ndarray profile: Intensity values of spectrum.
+    :param float base_diff: Difference between left and right baseline intensities.
+    :param int iterations: Maximum iterations.
+    :param float tol: Convergence tolerance.
+    :return: Calculated background intensity values.
+    :rtype: ndarray
     """
-    ite = 0
-    y = np.array(y)
-    n = len(y)
+    n = len(profile)
     bg = np.zeros(n)
-    peak_sum = np.trapezoid(y, dx=dx)
-    k = (
-        base_diff / peak_sum
-    )  # initial guess that uses the whole peak region (since we assume bg is 0)
+    cumulative_integral = np.empty(n)
 
-    while ite < iterations:
+    for ite in range(iterations):
+        diff = profile - bg
 
-        # calculate the integral
-        diff = y - bg
-        diff[0] = 0.5 * (diff[0])
-        diff[-1] = 0.5 * (diff[-1])
-        bg_new = dx * np.cumsum(diff[::-1])[::-1] * k
-        if np.linalg.norm(bg_new - bg) < tol:
-            # print(f"Converged after {ite} iterations.")
+        # Vectorized cumulative integral
+        intervals = 0.5 * (diff[:-1] + diff[1:])
+        cumulative_integral[n - 1] = 0
+        cumulative_integral[-2::-1] = np.cumsum(intervals[::-1])
+
+        total_integral = cumulative_integral[0]
+
+        if abs(total_integral) < 1e-10:
             break
-        else:
-            bg = bg_new
-        ite += 1
+
+        k = base_diff / total_integral
+        bg_new = k * cumulative_integral
+
+        if np.linalg.norm(bg_new - bg) < tol:
+            break
+
+        bg = bg_new
 
     return bg
 
 
 def pseudo_voigt_fits(peaks, constraints=None):
-    """Create XPS model for XPS fitting.
+    """Create composite pseudo-Voigt model for XPS peak fitting.
 
-    :param list peaks: The list of peaks to fit. The peak should be a string.
-    :param dict constraints: The constraints for the parameter fitting.
+    Combines multiple pseudo-Voigt peaks (Gaussian-Lorentzian mixture)
+    into single fitting model with optional parameter constraints.
+
+    :param list peaks: List of peak identifiers (e.g., ["C1s", "O1s"]).
+    :param dict constraints: Parameter constraints for lmfit.
+    :return: Composite model and initial parameters.
+    :rtype: tuple(lmfit.Model, lmfit.Parameters)
     """
 
     model_list = []
@@ -68,8 +70,7 @@ def pseudo_voigt_fits(peaks, constraints=None):
 
     model = np.sum(model_list)
 
-    # preset parameters to 0
-    # can be overwritten by the constraints
+    # Preset parameters to 0 (can be overwritten by constraints)
     for suffix in ["center", "amplitude", "sigma", "fraction"]:
         for pk in peaks:
             model.set_param_hint(pk + "_" + suffix, min=0)
@@ -81,204 +82,261 @@ def pseudo_voigt_fits(peaks, constraints=None):
     return model, params
 
 
-def plot_xps_fits(
-    ax,
-    res_ax,
-    x,
-    y,
-    bg,
-    result,
-    title="",
-    xlabel="Binding Energy [eV]",
-    inverted=True,
-):
-    """Plot the XPS fits.
+def parameter_estimation(profile, num_peaks, peak_prominence=0.1):
+    """Estimate initial parameters for XPS peak fitting.
 
-    :param ax: The axis to plot the data.
-    :param res_ax: The axis to plot the residuals.
-    :param ndarray x: The x-axis data.
-    :param ndarray y: The y-axis data.
-    :param model: The model to fit.
-    :param params: The parameters for the model.
-    :param result: The result of the fitting.
-    :param str title: The title of the plot.
+    Uses scipy peak detection to locate peaks and estimate positions,
+    widths, and areas.
+
+    :param ndarray profile: XPS intensity profile.
+    :param int num_peaks: Expected number of peaks.
+    :param float peak_prominence: Minimum prominence (fraction of max).
+    :return: Peak centers, estimated widths, and areas.
+    :rtype: tuple(ndarray, ndarray, ndarray)
     """
-    ax.plot(x, y, label="experimental data")
-    ax.plot(x, result.best_fit + bg, label="total fit")
-    ax.plot(x, bg, label="background")
-    for prefix, fit_array in result.eval_components().items():
-        ax.plot(x, fit_array + bg, label=f"{prefix}fit")
-    ax.set_title(title)
-    ax.legend()
+    # Find peaks
+    prominence = max(profile) * peak_prominence
+    peaks, _ = scipy.signal.find_peaks(profile, prominence=prominence)
 
-    ax.set_ylabel("Intensity")
-    res_ax.set_ylabel("Residuals")
-    res_ax.plot(x, result.residual, label="residuals")
-    res_ax.set_xlabel(xlabel)
+    while len(peaks) > num_peaks:
+        prominence = prominence * 1.5
+        peaks, _ = scipy.signal.find_peaks(profile, prominence=prominence)
 
-    if inverted:
-        ax.invert_xaxis()
-        res_ax.invert_xaxis()
-
-
-def df_fit_result(results, area=False, uncertainty=True):
-    """Output the fitting results.
-
-    :param results: The fitting results.
-    :param bool area: If True, then calculate the area of the peak.
-    :param bool uncertainty: If True, then include the uncertainty in the fitting.
-    """
-    report_list = []
-    for label, r in results:
-
-        report_dict = {"Sample": label}
-        if hasattr(r, "uvars") and uncertainty:
-            report_dict.update(r.uvars)
-        else:
-            report_dict.update(r.params.valuesdict())
-        if area:
-            area = []
-            for key, value in r.params.items():
-                if "amplitude" in key:
-                    label = key.replace("_amplitude", "_area")
-                    area.append([label, r.params[key].value])
-            total_area = sum(list(zip(*area))[1])
-            for label, value in area:
-                report_dict[label] = value / total_area
-        report_dict["Reduced_chi"] = r.redchi
-
-        report_list.append(report_dict)
-
-    report_df = pd.DataFrame(report_list)
-    report_df = report_df.set_index("Sample")
-    return report_df
-
-
-FILE_FORMAT = re.compile(
-    # 20240101_XPS_Sample1_E_1FA_700eV_412eV_C1s_C
-    # position is optional
-    # regex returns None if position is not present
-    r"(\d{8})_XPS_Sample(\d)_([A-Z]{1,2})_(\d[A-Z]{2})_"
-    r"(\d{1,4})eV_(\d{1,4})eV_([A-Za-z]{1,2}\d[a-z])_?([A-Z]\d{0,1})?"
-)
-FILE_KEYS = [
-    ("date", str),
-    ("sample", str),
-    ("condition", str),
-    ("aperture", str),
-    ("incident_voltage", float),
-    ("start_voltage", float),
-    ("element", str),
-    ("position", str),  # optional
-]
-
-
-def parse_filename(file, file_format=FILE_FORMAT, file_keys=FILE_KEYS):
-    """Parse the filename based on the file format.
-
-    Currently, some experiment metadata is encoded in the filename.
-    """
-    basefile = os.path.basename(file)
-    match = file_format.match(basefile)
-    if match:
-        file_info = {"filename": file}
-        for (key, tp), value in zip_longest(file_keys, match.groups()):
-            file_info[key] = tp(value)
-        return file_info
-    else:
-        raise ValueError(f"File name {file} does not match the expected format")
-
-
-def read_profile(file, incident_voltage, start_voltage, pixperev, peak_shift):
-    """Read XPS profile data.
-
-    This function supports two different types of csv file style.
-    The plot profile directly from ImageJ.
-    And the data exported using the ROIProfile plugin in ImageJ.
-    If more than two columns are detected, then only grab the last
-    two columns.
-    """
-
-    df = pd.read_csv(file, header=0)
-    if df.shape[1] > 2:
-        df = df.iloc[:, -2:]
-    df.columns = ["pixel", "intensity"]
-    df["kinetic energy"] = start_voltage + peak_shift + df["pixel"] / pixperev
-    df["binding energy"] = incident_voltage - df["kinetic energy"]
-    return df
-
-
-def profile_roi(image, roi, incident_voltage, start_voltage, pixel_per_ev, peak_shift):
-    """Profile the image based on the ROI object."""
-
-    profile = skimage.measure.profile_line(image, **roi)
-    pixel = np.arange(len(profile))
-    ke = start_voltage + peak_shift + pixel / pixel_per_ev
-    df = pd.DataFrame(
-        {
-            "intensity": profile,
-            "pixel": np.arange(len(profile)),
-            "kinetic energy": ke,
-            "binding energy": incident_voltage - ke,
-        }
+    # Find peak widths
+    widths, width_heights, left_ips, right_ips = scipy.signal.peak_widths(
+        profile, peaks, rel_height=0.5
     )
 
-    return df
+    sigmas = np.array(widths) / 2
+    # Peak area (by summation)
+    peak_areas = np.empty(len(peaks))
+    for i, p in enumerate(peaks):
+        peak_areas[i] = profile[
+            left_ips[i].astype(int) : right_ips[i].astype(int)
+        ].sum()
+
+    if len(peaks) < num_peaks:
+        if len(peaks) == 1:
+            peak = peaks[0]
+            peaks = np.array([peak - 0.1 * sigmas[0], peak + 0.1 * sigmas[0]])
+            sigmas = np.array([sigmas[0], sigmas[0]])
+            peak_areas = np.array([peak_areas[0] / 2, peak_areas[0] / 2])
+
+    return peaks, sigmas, peak_areas
 
 
-class XPSReader(RawReader):
-    """Read XPS specific LEEM raw data.
+def parameter_contraint(profile, num_peaks, peak_prominence=0.1):
+    """Create parameter constraints dictionary for XPS fitting.
 
-    The class reads the raw data, parses filename,
-    and profile the XPS data. Currently it does not allow
-    custom tags.
-
-    For file that is not the standard foramt, use a custom
-    file function for parse_func. The parsed dictionary
-    has to have "incident_voltage" and "start_voltage" keys.
-
-    TODO:
-        - Consider check the start voltage against metadata.
-
+    :param ndarray profile: XPS intensity profile.
+    :param int num_peaks: Number of peaks to fit.
+    :param float peak_prominence: Minimum prominence for detection.
+    :return: Constraints dictionary for lmfit.
+    :rtype: dict
     """
 
-    def __init__(self, path, roi, pixel_per_ev, peak_shift, parse_func=parse_filename):
-        super().__init__(path)
-        self.info = parse_func(path)
-        self.roi = roi
+    centers, sigmas, peak_areas = parameter_estimation(
+        profile, num_peaks, peak_prominence
+    )
 
-        # by default the start voltage is based on the filename
-        # assert self.file_info["start_voltage"] == self.imgmeta['Start Voltage'][0]
+    constr = {}
+    for i in range(1, num_peaks + 1):
+        constr[f"p{i}_center"] = {"value": centers[i - 1]}
+        constr[f"p{i}_amplitude"] = {"value": peak_areas[i - 1]}
+        constr[f"p{i}_sigma"] = {"value": sigmas[i - 1]}
+    return constr
 
-        self.profile = profile_roi(
-            self.read_image(),
-            roi,
-            self.info["incident_voltage"],
-            self.info["start_voltage"],
-            pixel_per_ev,
-            peak_shift,
+
+def fit_xps(profile, abscissa, baseline, peak_labels, constraints):
+    """Fit XPS spectrum with Shirley background and pseudo-Voigt peaks.
+
+    :param ndarray profile: XPS intensity profile.
+    :param ndarray abscissa: X-axis values (pixels or energy).
+    :param tuple baseline: Tuple (left_baseline, right_baseline) intensities.
+    :param list peak_labels: List of peak label strings.
+    :param dict constraints: Parameter constraints from parameter_contraint().
+    :return: Fit result and Shirley background.
+    :rtype: tuple(lmfit.ModelResult, ndarray)
+    """
+
+    bl_left, bl_right = baseline
+    # Background subtraction
+    bg = shirley_background(profile, bl_left - bl_right) + bl_right
+    sub_profile = profile - bg
+
+    model, param = pseudo_voigt_fits(peak_labels, constraints)
+
+    result = model.fit(sub_profile, x=abscissa, params=param)
+    return result, bg
+
+
+class XPSAnalyzer(ProfileAnalyzer):
+    """Analyzer for X-ray photoelectron spectroscopy data.
+
+    Handles energy calibration and provides binding energy scales.
+
+    :param str or Path path: Path to LEEM data file.
+    :param dict or LineROI roi: Region of interest for profile extraction.
+    :param float incident_voltage: X-ray beam energy.
+    """
+
+    def __init__(self, path, roi, incident_voltage):
+
+        super().__init__(path, roi, incident_voltage=incident_voltage)
+
+        self.metadata["Incident Voltage"] = (incident_voltage, "eV")
+
+    def transform_abscissa(self):
+        """Transform to binding energy scale."""
+
+        BE = (
+            self.incident_voltage
+            - self.metadata["Start Voltage"][0]
+            - self.roi.peak_shift
+            - self.pixel / self.roi.pixel_per_ev
         )
 
-    def custom_h5(self, group):
-        """Add XPS specific metadata to the h5 group.
+        return BE, "Binding Energy [eV]"
 
-        Create the profile group and add the roi and profile data.
-        The dimension is set to be the binding energy.
+    def postprocees(self):
+        """Postprocess the profile data."""
+        if self.is_calibrated:
+            self.KE = (
+                self.metadata["Start Voltage"][0]
+                + self.roi.peak_shift
+                + self.pixel / self.roi.pixel_per_ev
+            )
+            self.BE = self.incident_voltage - self.KE
+        else:
+            self.KE = None
+            self.BE = None
+
+    def fit(self, num_peaks, baseline, peak_prominence=0.1):
+        """Fit XPS spectrum with background subtraction.
+
+        :param int num_peaks: Number of peaks to fit.
+        :param tuple baseline: Tuple (left, right) background intensities.
+        :param float peak_prominence: Peak detection prominence.
+        :return: Fit result and Shirley background.
+        :rtype: tuple(lmfit.ModelResult, ndarray)
         """
 
-        group.attrs.update({k: v for k, v in self.info.items() if v})
-        profile_group = group.create_group("profile")
-        intensity = profile_group.create_dataset(
-            "intensity", data=self.profile["intensity"]
+        constraints = parameter_contraint(self.ordinate, num_peaks, peak_prominence)
+
+        # Convert peak positions from pixel space to binding energy space
+        for i in range(1, num_peaks + 1):
+            pixel_center = constraints[f"p{i}_center"]["value"]
+            # Map pixel index to the corresponding x-axis value (binding energy)
+            constraints[f"p{i}_center"]["value"] = self.abscissa[int(pixel_center)]
+
+        peak_labels = [f"p{i}" for i in range(1, num_peaks + 1)]
+
+        result, bg = fit_xps(
+            self.ordinate, self.abscissa, baseline, peak_labels, constraints
         )
 
-        be = profile_group.create_dataset(
-            "binding energy", data=self.profile["binding energy"]
+        return result, bg
+
+    def plot_fit(self, axes, result, background):
+        """Plot XPS fit results.
+
+        :param tuple axes: Tuple of two axes (profile, residuals).
+        :param lmfit.ModelResult result: Fitting result object.
+        :param ndarray background: Shirley background array.
+        """
+
+        ax_profile, ax_residual = axes
+        ax_profile.plot(self.abscissa, self.ordinate, label=f"{self.name} data")
+        ax_profile.plot(
+            self.abscissa, result.best_fit + background, label=f"{self.name} fit"
         )
-        be.attrs["unit"] = "eV"
-        be.make_scale()
+        ax_profile.plot(self.abscissa, background, label=f"{self.name} background")
+        for prefix, fit_array in result.eval_components().items():
+            ax_profile.plot(
+                self.abscissa, fit_array + background, label=f"{self.name} {prefix} fit"
+            )
+        ax_profile.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+        ax_profile.set_ylabel(self.ordinate_label)
 
-        intensity.dims[0].label = "binding energy"
-        intensity.dims[0].attach_scale(be)
+        ax_residual.set_ylabel("Residuals")
+        ax_residual.plot(self.abscissa, result.residual, label=f"{self.name} residuals")
+        ax_residual.set_xlabel(self.abscissa_label)
+        ax_residual.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
-        self.roi.to_h5(profile_group)
+
+class XPSGroup(AnalyzerGroup):
+    """Batch analyzer for XPS spectra.
+
+    :param list paths: List of paths to LEEM data files.
+    :param dict or LineROI roi: Region of interest for profile extraction.
+    :param float incident_voltage: X-ray photon energy in eV.
+    """
+
+    def __init__(self, paths, roi, incident_voltage):
+        super().__init__(
+            paths, analyzer=XPSAnalyzer, roi=roi, incident_voltage=incident_voltage
+        )
+
+    def calibrate(self, cal_params, plot=False):
+        """Calibrate pixel-to-eV conversion using multiple spectra.
+
+        Supports calibration with two or more files by analyzing peak
+        positions across different accelerating voltages.
+
+        :param dict cal_params: Dictionary with 'baselines', 'num_peaks', optional
+            'pixel_per_ev', 'peak_shift', 'ref_index', 'ref_value', 'peak_prominence'.
+        :param bool plot: Whether to display calibration plots.
+        :return: Calibration results (pixel_per_ev, peak_shift).
+        :rtype: dict
+        """
+
+        baselines, num_peaks = cal_params["baselines"], cal_params["num_peaks"]
+        peak_prominence = cal_params.get("peak_prominence", 0.1)
+
+        bgs = []
+        results = []
+        peak_results = []
+
+        for i, analyzer in enumerate(self.analyzers):
+
+            result, bg = analyzer.fit(num_peaks, baselines[i], peak_prominence)
+            peaks = [v for k, v in result.best_values.items() if "_center" in k]
+            results.append(result)
+            peak_results.append(peaks)
+            bgs.append(bg)
+
+        start_voltages = np.array(self.get_metas("Start Voltage"))
+        delta_ev = np.diff(start_voltages)
+
+        pixel_per_ev = cal_params.get("pixel_per_ev", None)
+        peak_shift = cal_params.get("peak_shift", None)
+
+        if pixel_per_ev is None:
+            # Average over the peaks (the peak splitting should remain the same)
+            peak_diff = np.diff(peak_results, axis=0).mean(axis=1)
+            pixel_per_ev = np.mean(peak_diff / -delta_ev)
+
+        ref_index, ref_value = cal_params.get("ref_index", None), cal_params.get(
+            "ref_value", None
+        )
+
+        if ref_index is None or ref_value is None:
+            # No reference peak adjustment
+            peak_shift = 0
+        else:
+            peak_pos = np.array(list(zip(*peak_results))[ref_index]) / pixel_per_ev
+
+            peak_shift = np.mean(
+                self.incident_voltage - start_voltages - ref_value - peak_pos
+            )
+
+        if plot:
+            fig, axes = plt.subplots(
+                2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True
+            )
+            plt.subplots_adjust(hspace=0, wspace=0)
+            for i, analyzer in enumerate(self.analyzers):
+                analyzer.plot_fit(axes, results[i], bgs[i])
+            plt.show()
+
+        return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}

@@ -1,121 +1,161 @@
 from pyleem.metadata import (
-    get_header,
     convert_win_filetime,
-    get_imgmeta,
-    get_imgmeta_index,
+    get_metadata,
+    parse_leem_data,
+    is_tag_in_range,
 )
 import pytest
-
-
-def test_get_header(header_bytes, header_parsed):
-    """Test extract_headermeta function."""
-
-    headermeta = get_header(header_bytes)
-
-    assert headermeta == header_parsed
+import struct
+import numpy as np
+from datetime import datetime
 
 
 def test_convert_win_filetime():
-    """Test convert_win_filetime function."""
-    # Windows filetime for 2023-01-01 00:00:00
-    win_time = 133170720000000000
-    dt = convert_win_filetime(win_time)
-    assert dt == "2023/01/01 13:40:00.000000"
+    """Test Windows filetime conversion (UTC)."""
+    win_time = 133801824000000000
+    assert convert_win_filetime(win_time) == "2025/01/01 05:20:00.000000"
 
 
-def test_get_imgmeta_index():
-    """Test get_imgmeta_index function."""
-    headermeta = {
-        "file_header_size": 100,
-        "img_header_size": 50,
-        "marked_header_size": 128,
-        "img_meta_size": 200,
-    }
+def test_get_metadata(metadata_bytes, header_parsed):
+    """Test metadata extraction from bytes."""
+    metadata = get_metadata(metadata_bytes)
 
-    slice = get_imgmeta_index(headermeta)
-    assert slice.start == 278
-    assert slice.stop == 478
+    for key in header_parsed.keys():
+        assert metadata[key][0] == header_parsed[key]
+
+    # Verify timestamp conversion
+    assert metadata["ImageTime"][0] == "2026/01/01 00:00:00.000000"
+    assert isinstance(metadata["ImageTime"][0], str)
+    assert isinstance(metadata["TimeStamp"][0], datetime)
+
+    # Verify all entries are tuples
+    for value in metadata.values():
+        assert isinstance(value, tuple) and len(value) == 2
 
 
-def test_get_imgmeta(img_metabytes):
-    """Test get_imgmeta function."""
+def test_is_tag_in_range():
+    """Test tag range checking with bit masking."""
+    assert is_tag_in_range(50, (0, 99))
+    assert is_tag_in_range(178, (0, 99))  # 178 & 0x7F = 50
+    assert not is_tag_in_range(232, (0, 99))  # 232 & 0x7F = 104
+    assert not is_tag_in_range(100, (0, 99))
 
-    standard_tags = [1, 2]
-    gauge_tags = [3]
-    special_tags = {
-        4: [("FOV Value", None, ""), (None, "<f", "")],
-        5: [("Avg", "<H", ""), ("content", "<5s", "")],
-        6: [(None, "<f", ""), ("Secs", "<f", "s")],
-    }
 
-    result = get_imgmeta(
-        img_metabytes,
-        std_tags=standard_tags,
-        gauge_tags=gauge_tags,
-        special_tags=special_tags,
+def test_parse_standard_tags():
+    """Test parsing standard tags."""
+    # Tag with unit code
+    data = b"\x02Start Voltage1\x00" + struct.pack("<f", 10.5)
+    leemdata = parse_leem_data(data)
+    assert leemdata["Start Voltage"][0] == 10.5
+    assert leemdata["Start Voltage"][1] == "V"
+
+    # Tag without unit code
+    data = b"\x03Start Voltage\x00" + struct.pack("<f", 25.3)
+    leemdata = parse_leem_data(data)
+    assert np.isclose(leemdata["Start Voltage"][0], 25.3)
+    assert leemdata["Start Voltage"][1] is None
+
+    # Standard tag with special markers
+    data = b"\x02Start Voltage\x00" + b"sO\xc3G"
+    leemdata = parse_leem_data(data)
+    assert leemdata["Start Voltage"][0] == "invalid"
+
+    data = b"\x03Control\x00" + b"\xf3O\xc3G"
+    leemdata = parse_leem_data(data)
+    assert leemdata["Control"][0] == "local"
+
+
+def test_parse_gauge_tags():
+    """Test parsing gauge tags."""
+    data = b"\x6aPressure\x00Torr\x00" + struct.pack("<f", 1.5e-6)
+    leemdata = parse_leem_data(data)
+    assert leemdata["Pressure"][0] == pytest.approx(1.5e-6)
+    assert leemdata["Pressure"][1] == "Torr"
+
+
+def test_parse_camera_tags():
+    """Test parsing camera exposure and average tags."""
+    data = b"\x68" + struct.pack("<f", 0.5) + struct.pack("<BB", 4, 0)
+    leemdata = parse_leem_data(data)
+    assert leemdata["Camera Exposure"][0] == 0.5
+    assert leemdata["Camera Average"][0] == 4
+    assert leemdata["Camera Average Mode"][0] == "no average"
+
+    # Different average modes
+    data = b"\x68" + struct.pack("<f", 0.5) + struct.pack("<bb", 4, 1)
+    assert parse_leem_data(data)["Camera Average Mode"][0] == "average"
+
+    data = b"\x68" + struct.pack("<f", 0.5) + struct.pack("<bb", 4, -1)
+    assert parse_leem_data(data)["Camera Average Mode"][0] == "sliding average"
+
+
+def test_parse_special_tags():
+    """Test parsing special tags."""
+    # Image title
+    data = b"\x69Test Image\x00"
+    leemdata = parse_leem_data(data)
+    assert leemdata["Image Title"][0] == "Test Image"
+
+    # FOV tag
+    data = b"\x6eFOV5\x00" + struct.pack("<f", 7.5)
+    leemdata = parse_leem_data(data)
+    assert leemdata["FOV"][0] == "FOV5"
+    assert leemdata["Cal. FOV"][0] == pytest.approx(7.5)
+
+    # Data tag (Micrometers)
+    data = b"\x64" + struct.pack("<f", 100.5) + struct.pack("<f", 200.3)
+    leemdata = parse_leem_data(data)
+    assert leemdata["Micrometers X"][0] == pytest.approx(100.5)
+    assert leemdata["Micrometers Y"][0] == pytest.approx(200.3)
+
+
+def test_parse_end_marker():
+    """Test end marker and complex tag combinations."""
+    # Test end marker
+    data = (
+        b"\x02FOV\x00"
+        + struct.pack("<f", 10.5)
+        + b"\xff"
+        + b"\x03Start Voltage\x00"
+        + struct.pack("<f", 25.3)
     )
-    assert result["Standard X"][0] == 1.0
-    assert result["Standard X"][1] == "V"
+    leemdata = parse_leem_data(data)
+    assert "FOV" in leemdata
+    assert "Start Voltage" not in leemdata
 
-    assert result["Standard. Y"][0] == 2.0
-    assert result["Standard. Y"][1] == "mA"
-
-    assert result["Gauge"][0] == 3.0
-    assert result["Gauge"][1] == "mBar"
-
-    assert result["FOV Value"][0] == "FOV"
-    assert result["FOV Value"][1] == ""
-
-    assert result["Avg"][0] == 1
-    assert result["content"][0] == "Value"
-
-    assert result["Secs"][0] == 1.0
-    assert result["Secs"][1] == "s"
-
-
-def test_get_imgmeta_user_tags(img_metabytes):
-    """Test get_imgmeta function with user tags.
-
-    Here we replace the parsing for a standard tag, gauge tag, and special tag.
-    """
-
-    standard_tags = [1, 2]
-    gauge_tags = [3]
-    special_tags = {
-        4: [("FOV Value", None, ""), (None, "<f", "")],
-        5: [("Avg", "<H", ""), ("content", "<5s", "")],
-        6: [(None, "<f", ""), ("Secs", "<f", "s")],
-    }
-
-    user_tags = {
-        1: [(None, None, ""), ("Sample Temperature", "<f", "°C")],
-        3: [(None, "<11s", ""), ("PCH", "<f", "mTorr")],
-        4: [
-            ("Preset (FOV)", None, ""),
-            ("Undetermined", "<f", ""),
-        ],  # predefined tag
-    }
-
-    result = get_imgmeta(
-        img_metabytes, user_tags, standard_tags, gauge_tags, special_tags
+    # Test multiple tag types
+    data = (
+        b"\x02FOV1\x00"
+        + struct.pack("<f", 10.5)
+        + b"\x6aPressure\x00mBar\x00"
+        + struct.pack("<f", 2.5e-5)
+        + b"\x68"
+        + struct.pack("<f", 0.5)
+        + struct.pack("<bb", 4, -1)
+        + b"\xff"
     )
+    leemdata = parse_leem_data(data)
+    assert leemdata["FOV"][0] == 10.5
+    assert leemdata["Pressure"][0] == pytest.approx(2.5e-5)
+    assert leemdata["Camera Exposure"][0] == 0.5
 
-    assert result["Sample Temperature"][0] == 1.0
-    assert result["Sample Temperature"][1] == "°C"
-
-    assert result["PCH"][0] == 3.0
-    assert result["PCH"][1] == "mTorr"
-
-    assert result["Preset (FOV)"][0] == "FOV"
-    assert result["Undetermined"][0] == 7.0
+    # Test empty data
+    assert parse_leem_data(b"") == {}
 
 
-def test_get_imgmeta_invalid_tag():
-    """Test get_imgmeta function with invalid tag."""
+def test_metadata_with_nan_values(header_bytes):
+    """Test metadata handling of NaN values."""
+    empty_1 = b"\xff" * 240
+    marker = (
+        b"\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x04"
+        b"\x00\x00\x80\x00\x00\x00\x03\x00\xce\x02\xc7\x03'\x01e\x00$\x01\n\x00"
+    )
+    empty_2 = b"\x00" * 110
+    # Create tag with NaN value
+    img_header = b"\x02Test\x00" + struct.pack("<f", float("nan")) + b"\xff\xff"
 
-    mock_data = b"\xFF"  # termination tag
-    result = get_imgmeta(mock_data)
-    assert result == {}
+    metadata_bytes = header_bytes + empty_1 + marker + empty_2 + img_header
+    metadata = get_metadata(metadata_bytes)
 
-    with pytest.raises(ValueError, match="Unknown tag 32"):
-        get_imgmeta(b"\x20")  # unknown tag
+    assert "Test" in metadata
+    assert np.isnan(metadata["Test"][0])
