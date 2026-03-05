@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 
 def preprocess_image(image, gamma=0.5, blur_kernel=5, morph_kernel_size=3):
-    """Preprocess LEED image in circular patterns.
+    """Preprocess DESP image in circular patterns.
 
     Normalizes image, applies gamma correction for contrast enhancement,
     median blur for noise reduction, and morphological closing.
@@ -35,13 +35,13 @@ def preprocess_image(image, gamma=0.5, blur_kernel=5, morph_kernel_size=3):
 
 
 def get_radius(image):
-    """Detect and measure the circular pattern in a LEED image.
+    """Detect and measure the circular pattern in a DESP image.
 
     In this process we assume that there is only one circular pattern in the image.
     Uses bilateral filtering, Otsu thresholding, contour detection,
     and minimum enclosing circle to determine center and radius.
 
-    :param ndarray image: Preprocessed LEED image (uint8).
+    :param ndarray image: Preprocessed DESP image (uint8).
     :return: Circle center (x, y) and radius in pixels.
     :rtype: tuple(int, int, int)
     """
@@ -56,13 +56,13 @@ def get_radius(image):
     return int(x), int(y), int(radius)
 
 
-class AmorphLEEDAnalyzer(Analyzer):
-    """Analyzer for amorphous LEED patterns.
+class DESPAnalyzer(Analyzer):
+    """Analyzer for amorphous DESP patterns.
 
-    Analyzes LEED micrographs to detect circular diffraction patterns
+    Analyzes DESP micrographs to detect circular diffraction patterns
     and measure charging effects through pattern radius changes.
 
-    :param str or Path path: Path to LEEM/LEED data file.
+    :param str or Path path: Path to LEEM data file.
     :param callable interp_func: Interpolation function for radius-to-potential conversion.
 
     :ivar int x: X-coordinate of circle center.
@@ -86,7 +86,7 @@ class AmorphLEEDAnalyzer(Analyzer):
         return preprocess_image(self.image)
 
     def plot_radius(self, ax):
-        """Plot the detected circle on the LEED pattern.
+        """Plot the detected circle on the DESP pattern.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
         """
@@ -98,18 +98,18 @@ class AmorphLEEDAnalyzer(Analyzer):
         ax.plot(self.x, self.y, "r+", markersize=5)
 
 
-class AmorphLEEDGroup(AnalyzerGroup):
-    """Batch analyzer for multiple amorphous LEED patterns.
+class DESPGroup(AnalyzerGroup):
+    """Batch analyzer for multiple amorphous DESP patterns.
 
-    Processes multiple LEED micrographs and calibrates radius-to-voltage
+    Processes multiple DESP micrographs and calibrates radius-to-voltage
     relationship using standard patterns with known voltages.
 
-    :param list paths: List of paths to LEED data files.
+    :param list paths: List of paths to DESP data files.
     :param kwargs: Additional keyword arguments for AnalyzerGroup.
     """
 
     def __init__(self, paths, **kwargs):
-        super().__init__(paths, analyzer=AmorphLEEDAnalyzer, **kwargs)
+        super().__init__(paths, analyzer=DESPAnalyzer, **kwargs)
 
     def calibrate(self):
         """Create radius-to-voltage calibration function.

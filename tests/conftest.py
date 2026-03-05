@@ -174,13 +174,13 @@ def sees_raw_file(tmp_path, metadata_bytes, sees_array):
 
 
 @pytest.fixture
-def leed_raw_file(tmp_path, metadata_bytes):
-    """Create a single LEED raw file with a circular pattern."""
+def desp_raw_file(tmp_path, metadata_bytes):
+    """Create a single DESP raw file with a circular pattern."""
     image = np.zeros((256, 128), dtype=np.uint16)
     cv2.circle(image, (64, 128), 40, 1000, -1)
-    leed_file = tmp_path / "test_leed.dat"
-    leed_file.write_bytes(metadata_bytes + b"\xff" * 2000 + image.tobytes())
-    return leed_file
+    desp_file = tmp_path / "test_desp.dat"
+    desp_file.write_bytes(metadata_bytes + b"\xff" * 2000 + image.tobytes())
+    return desp_file
 
 
 @pytest.fixture
@@ -229,8 +229,8 @@ def sees_multiple_raw_files(tmp_path, metadata_bytes):
 
 
 @pytest.fixture
-def leed_files(tmp_path, metadata_bytes):
-    """Create multiple LEED raw files with different circle radii."""
+def desp_files(tmp_path, metadata_bytes):
+    """Create multiple DESP raw files with different circle radii."""
     files = []
 
     for i in range(3):
@@ -238,9 +238,9 @@ def leed_files(tmp_path, metadata_bytes):
         image = np.zeros((256, 128), dtype=np.uint16)
         cv2.circle(image, (64, 128), 30 + i * 10, 1000, -1)
 
-        leed_file = tmp_path / f"test_leed_{i}.dat"
-        leed_file.write_bytes(modified_metadata + b"\xff" * 2000 + image.tobytes())
-        files.append(leed_file)
+        desp_file = tmp_path / f"test_desp_{i}.dat"
+        desp_file.write_bytes(modified_metadata + b"\xff" * 2000 + image.tobytes())
+        files.append(desp_file)
     return files
 
 @pytest.fixture

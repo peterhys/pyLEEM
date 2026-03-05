@@ -1,13 +1,7 @@
 import numpy as np
 import cv2
-from pyleem.amorphleed import (
-    preprocess_image,
-    get_radius,
-    AmorphLEEDAnalyzer,
-    AmorphLEEDGroup,
-)
+from pyleem.desp import preprocess_image, get_radius, DESPAnalyzer, DESPGroup
 import pytest
-import matplotlib.pyplot as plt
 
 
 def test_preprocess_basic():
@@ -38,45 +32,45 @@ def test_get_radius_with_noise():
     assert 80 < x < 120 and 80 < y < 120 and 40 < radius < 80
 
 
-class TestAmorphLEEDAnalyzer:
-    """Test AmorphLEEDAnalyzer class."""
+class TestDESPAnalyzer:
+    """Test DESPAnalyzer class."""
 
     @pytest.fixture
-    def leed_analyzer(self, leed_raw_file):
-        """Create an AmorphLEEDAnalyzer instance."""
-        return AmorphLEEDAnalyzer(leed_raw_file)
+    def desp_analyzer(self, desp_raw_file):
+        """Create an 1DESPAnalyzer instance."""
+        return DESPAnalyzer(desp_raw_file)
 
-    def test_init(self, leed_analyzer):
+    def test_init(self, desp_analyzer):
         """Test analyzer initialization."""
-        assert leed_analyzer.x == 64
-        assert leed_analyzer.y == 128
-        assert leed_analyzer.radius == 40
+        assert desp_analyzer.x == 64
+        assert desp_analyzer.y == 128
+        assert desp_analyzer.radius == 40
 
-    def test_processed_image_property(self, leed_analyzer):
+    def test_processed_image_property(self, desp_analyzer):
         """Test processed_image property."""
-        assert isinstance(leed_analyzer.processed_image, np.ndarray)
-        assert leed_analyzer.processed_image.shape == (256, 128)
-        assert leed_analyzer.processed_image.dtype == np.uint8
-        assert leed_analyzer.processed_image.min() == 0
-        assert leed_analyzer.processed_image.max() == 255
+        assert isinstance(desp_analyzer.processed_image, np.ndarray)
+        assert desp_analyzer.processed_image.shape == (256, 128)
+        assert desp_analyzer.processed_image.dtype == np.uint8
+        assert desp_analyzer.processed_image.min() == 0
+        assert desp_analyzer.processed_image.max() == 255
 
 
-class TestAmorphLEEDGroup:
-    """Test AmorphLEEDGroup class."""
+class TestDESPGroup:
+    """Test DESPGroup class."""
 
     @pytest.fixture
-    def leed_group(self, leed_files):
-        """Create an AmorphLEEDGroup instance."""
-        return AmorphLEEDGroup(leed_files)
+    def desp_group(self, desp_files):
+        """Create an DESPGroup instance."""
+        return DESPGroup(desp_files)
 
-    def test_init(self, leed_group):
+    def test_init(self, desp_group):
         """Test group initialization."""
-        assert leed_group.get_attrs("radius") == [30, 40, 50]
+        assert desp_group.get_attrs("radius") == [30, 40, 50]
 
-    def test_calibrate_method(self, leed_group):
+    def test_calibrate_method(self, desp_group):
         """Test calibration returns interpolation function."""
 
-        interp_func = leed_group.calibrate()
+        interp_func = desp_group.calibrate()
         assert interp_func(30) == 200
         assert interp_func(35) == 200.5
         assert interp_func(40) == 201

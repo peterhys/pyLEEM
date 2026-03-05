@@ -43,15 +43,13 @@ class Analyzer:
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
         """
-        if ax is None:
-            fig, ax = plt.subplots()
+        ax = ax or plt.gca()
         ax.imshow(self.image)
+        ax.set_xlabel("X (pixels)")
+        ax.set_ylabel("Y (pixels)")
+        ax.set_title("Raw Image Data")
 
-        if ax is None:
-            ax.set_xlabel("X (pixels)")
-            ax.set_ylabel("Y (pixels)")
-            ax.set_title("Raw Image Data")
-            fig.show()
+        return ax
 
 
 class ProfileAnalyzer(Analyzer):
