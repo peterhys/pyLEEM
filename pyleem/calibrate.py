@@ -1,5 +1,6 @@
 import tomllib
 import tomlkit
+from pathlib import Path
 from pyleem.roi import LineROI
 
 
@@ -11,6 +12,7 @@ def read_config(config_path):
     :rtype: tuple(dict, dict)
     """
 
+    config_path = Path(config_path)
     with open(config_path, "rb") as f:
         config = tomllib.load(f)
 
