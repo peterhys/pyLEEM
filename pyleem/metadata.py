@@ -1,174 +1,225 @@
 from pyleem.metainfo import (
-    FILE_INFO,
-    IMG_INFO,
-    STD_TAGS,
-    GAUGE_TAGS,
-    SPEC_TAGS,
-    UNIT_DICT,
+    FILE_CONTENTS,
+    IMG_CONTENTS,
+    UNIT_CODES,
+    DATA_TAGS,
 )
-import logging
 import struct
-from datetime import datetime
-
-
-logger = logging.getLogger(__name__)
+from datetime import datetime, timedelta, timezone
 
 
 def convert_win_filetime(timestamp):
-    """Convert windows filetime to unix epoch.
+    """Convert Windows filetime to datetime string.
 
-    Returns a time string with the format of YYYY/MM/DD HH:MM:SS.
-    The string format is for saving to a HDF5 file.
+    Windows filetime is a 64-bit value representing 100-nanosecond
+    intervals since January 1, 1601 (UTC). To further
+    convert to local time, need to add the timezone offset.
+
+    :param int timestamp: Windows filetime value.
+    :return: Formatted datetime string (YYYY/MM/DD HH:MM:SS.ffffff).
+    :rtype: str
+    """
+    epoch = datetime(1601, 1, 1, tzinfo=timezone.utc)
+    dt = epoch + timedelta(microseconds=timestamp / 10)
+    return dt.strftime("%Y/%m/%d %H:%M:%S.%f")
+
+
+def get_metadata(metabytes):
+    """Extract and parse metadata from UView .dat file header.
+
+    :param bytes metabytes: Raw metadata bytes from file header.
+    :return: Dictionary of metadata entries as (value, unit) tuples.
+    :rtype: dict
     """
 
-    # 11644473600 is the difference between windows epoch and unix epoch
-    return datetime.fromtimestamp(timestamp / 1e7 - 11644473600).strftime(
-        "%Y/%m/%d %H:%M:%S.%f"
-    )
-
-
-def get_header(metabytes, file_info=FILE_INFO, img_info=IMG_INFO):
-    """Extract metadata file header.
-
-    The first 20 bytes are dedicated to the file name.
-    """
-    header_metadata = {}
+    metadata = {}
 
     # filetype
     filetypebytes = metabytes[:20]
     filetype = filetypebytes.split(b"\x00")[0]
-    header_metadata["filetype"] = filetype.decode("utf-8")
+    metadata["filetype"] = (filetype.decode("utf-8"), None)
 
     pos = 20
-    for entry, format in file_info:
-        size = struct.calcsize(format)  # allows arbitrary format
+    for entry, format in FILE_CONTENTS:
+        size = struct.calcsize(format)
         value = struct.unpack(format, metabytes[pos : pos + size])[0]
         if entry is not None:
-            header_metadata[entry] = value
+            metadata[entry] = (value, None)
         pos += size
 
-    if header_metadata["attachedrecipesize"] > 0:
-        recipe = metabytes[pos : pos + header_metadata["attachedrecipesize"]]
-        header_metadata["recipe"] = recipe.decode("utf-8")
-        pos += header_metadata["attachedrecipesize"]
+    if metadata["attachedRecipeSize"][0] > 0:
+        recipe = metabytes[pos : pos + metadata["attachedRecipeSize"][0]]
+        metadata["recipe"] = (recipe.decode("utf-8"), None)
+        pos += metadata["attachedRecipeSize"]
     else:
-        header_metadata["recipe"] = None
+        metadata["recipe"] = (None, None)
 
-    assert header_metadata["file_header_size"] >= pos  # check the position is correct
+    assert metadata["FileSize"][0] >= pos
 
-    # reset pos to the correct system metadata end size
+    # Reset to system metadata end
+    pos = metadata["FileSize"][0]
 
-    pos = header_metadata["file_header_size"]
-
-    for entry, fmt in img_info:
+    for entry, fmt in IMG_CONTENTS:
         size = struct.calcsize(fmt)
         value = struct.unpack(fmt, metabytes[pos : pos + size])[0]
         if entry is not None:
-            header_metadata[entry] = value
+            metadata[entry] = (value, None)
         pos += size
 
-    # post processing
+    pos = metadata["ImageSize"][0] + metadata["FileSize"][0]
 
-    header_metadata["timestamp"] = convert_win_filetime(header_metadata["timestamp"])
-    header_metadata["marked_header_size"] = 128 * (
-        header_metadata["attachedmarkedsize"] // 128 + 1
+    # Markup data
+    markup_size = metadata["attachedMarkupSize"][0]
+    actual_block_size = 128 * ((markup_size // 128) + 1)
+    metadata["markup_block_size"] = (actual_block_size, None)
+    metadata["markup_data"] = (metabytes[pos : pos + actual_block_size].hex(), None)
+
+    pos = (
+        metadata["FileSize"][0]
+        + metadata["ImageSize"][0]
+        + metadata["markup_block_size"][0]
     )
 
-    return header_metadata
+    # Read optional extra LEEM data
+    if metadata["LEEMdataVersion"][0] > 2:
+        extra_size = metadata["LEEMdataVersion"][0]
+        leemdataextra = metabytes[pos : pos + extra_size]
+        metadata["extra_leem_data"] = (leemdataextra, None)
+        leemdata = parse_leem_data(leemdataextra)
+    else:
+        metadata["extra_leem_data"] = b""
+        leemdata = {}
+
+    # Post-processing
+    # image time is a string
+    # time stamp is a datetime object
+    metadata["ImageTime"] = (convert_win_filetime(metadata["ImageTime"][0]), None)
+    metadata["TimeStamp"] = (
+        datetime.strptime(metadata["ImageTime"][0], "%Y/%m/%d %H:%M:%S.%f"),
+        None,
+    )
+
+    metadata.update(leemdata)
+
+    return metadata
 
 
-def get_imgmeta_index(headermeta_dict):
-    """Return the index of the imagemeta."""
+def is_tag_in_range(tag, range):
+    """Check whether tag's base value is within range.
 
-    sysheader_size = headermeta_dict["file_header_size"]
-    imageheader_size = headermeta_dict["img_header_size"]
-    markedheader_size = headermeta_dict["marked_header_size"]
-    header_size = sysheader_size + imageheader_size + markedheader_size
-    return slice(header_size, header_size + headermeta_dict["img_meta_size"])
+    UView uses the highest bit to mark image overlay. This function
+    masks that bit before checking range. Range min and max can be
+    the same value for a single tag.
+
+    :param int tag: Integer tag value (0-255).
+    :param tuple range: Tuple (min_base, max_base) defining range.
+    :return: True if base tag is within range, False otherwise.
+    :rtype: bool
+    """
+    base_tag = tag & 0x7F
+    return range[1] >= base_tag >= range[0]
 
 
-def get_imgmeta(
-    data,
-    user_tags=None,
-    std_tags=STD_TAGS,
-    gauge_tags=GAUGE_TAGS,
-    special_tags=SPEC_TAGS,
-    unit_dict=UNIT_DICT,
-):
-    """Extract image metadata from the data
+def parse_leem_data(data):
+    """Parse LEEM-specific metadata from extra data block.
 
-    :param bytes data: image metadata bytes
-    :param dict user_tags: custom tags or parsing options
-        user_tags only supports defined pre-defined length
+    LEEM data contains tagged metadata with various formats including
+    standard values, gauge readings, and camera settings.
+
+    :param bytes data: LEEM metadata bytes.
+    :return: Dictionary of metadata as (value, unit) tuples.
+    :rtype: dict
+    :raises ValueError: If an unrecognized tag value is encountered.
     """
 
-    # allow custom format
-    # the same as special tags
-    # override existing tags
-    user_tags = user_tags or {}
-    special_tags_combined = {**special_tags, **user_tags}
-    imagemeta_dict = {}
+    leemdata = {}
+
     while data:
-        tag = data[0]  # first byte is the tag
+        tag = data[0]
         data = data[1:]
 
-        logger.debug(f"Tag: {tag}, Data: {data[:40]}")
+        if tag == 255:
+            # end tag
+            break
 
-        if tag in special_tags_combined:
+        elif is_tag_in_range(tag, (0, 99)):
+            # standard tags 0..99
 
-            # maybe more info than just the value
-            for name, fmt, unit in special_tags_combined[tag]:
-
-                if fmt is None:  # variable length string that ends with \x00
-                    value = data.split(b"\x00", maxsplit=1)[0]
-                    size = len(value) + 1  # include the null byte
-                else:
-                    size = struct.calcsize(fmt)
-                    value = struct.unpack(fmt, data[:size])[0]
-
-                if isinstance(value, bytes):
-                    try:
-                        value = value.decode("utf-8")
-                    except:
-                        value = value
-
-                data = data[size:]
-
-                if name is not None:
-                    imagemeta_dict[name] = (value, unit, tag)
-
-        elif tag in std_tags:
-            # the standard size is float 4 bytes
-
-            name, data = data.split(b"\x00", maxsplit=1)
-
+            source, data = data.split(b"\x00", maxsplit=1)
+            source = source.decode("utf-8")
             if data[:4] == b"sO\xc3G":
-                value = "Invalid"
+                value = "invalid"
             elif data[:4] == b"\xf3O\xc3G":
-                value = "Local"
+                value = "local"
             else:
                 value = struct.unpack(f"<f", data[:4])[0]
 
+            last_char = source[-1]
+            unit = None
+            if last_char.isdigit() and int(last_char) in UNIT_CODES:
+                unit = UNIT_CODES[int(last_char)]
+                source = source[:-1]
+
+            leemdata[source] = (value, unit)
             data = data[4:]
-            if chr(name[-1]) in unit_dict:
-                unit = unit_dict[chr(name[-1])]
-                name = name[:-1]
-            else:
-                unit = ""
 
-            imagemeta_dict[name.decode("utf-8")] = (value, unit, tag)
-
-        elif tag in gauge_tags:
-            # data is float 4 bytes
-            name, unit, data = data.split(b"\x00", maxsplit=2)
+        elif is_tag_in_range(tag, (106, 109)) or is_tag_in_range(tag, (120, 126)):
+            # gauge tags
+            # 106 - 109 are standard gauge tags
+            # additional gauge tags are 120 - 126 (the menu suggests 127 - 130
+            # are also gauge tags but they are outside of the correct range)
+            source, unit, data = data.split(b"\x00", maxsplit=2)
+            source = source.decode("utf-8")
+            unit = unit.decode("utf-8")
             value = struct.unpack(f"<f", data[:4])[0]
 
+            leemdata[source] = (value, unit)
             data = data[4:]
-            imagemeta_dict[name.decode("utf-8")] = (value, unit.decode("utf-8"), tag)
 
-        elif tag == 255:
-            break
+        elif is_tag_in_range(tag, (100, 100)) or is_tag_in_range(tag, (111, 116)):
+
+            base_tag = tag & 0x7F
+
+            for source, unit, arg_struct in DATA_TAGS[base_tag]:
+                size = struct.calcsize(arg_struct)
+                value = struct.unpack(arg_struct, data[:size])[0]
+
+                leemdata[source] = (value, unit)
+                data = data[size:]
+
+        elif is_tag_in_range(tag, (104, 104)):
+            # camera exposure and average
+            # at least in our instrument, the average value is reversed compared to
+            # the menu settings, where the average count is before the settting
+            exposure, average_count, average_mode = struct.unpack(f"<fbb", data[:6])
+
+            leemdata["Camera Exposure"] = (exposure, "s")
+            leemdata["Camera Average"] = (average_count, None)
+
+            if average_mode == 0:
+                leemdata["Camera Average Mode"] = ("no average", None)
+            elif average_mode > 0:
+                leemdata["Camera Average Mode"] = ("average", None)
+            elif average_mode < 0:
+                leemdata["Camera Average Mode"] = ("sliding average", None)
+
+            data = data[6:]
+
+        elif is_tag_in_range(tag, (105, 105)):
+            # image title
+            title, data = data.split(b"\x00", maxsplit=1)
+            leemdata["Image Title"] = (title.decode("utf-8"), None)
+
+        elif is_tag_in_range(tag, (110, 110)):
+            # FOV
+            fov, data = data.split(b"\x00", maxsplit=1)
+            leemdata["FOV"] = (fov.decode("utf-8"), None)
+
+            cal_fov = struct.unpack(f"<f", data[:4])[0]
+            leemdata["Cal. FOV"] = (cal_fov, None)
+            data = data[4:]
 
         else:
-            raise ValueError(f"Unknown tag {tag}")
-    return imagemeta_dict
+            raise ValueError(f"Incorrect tag value: {tag}")
+
+    return leemdata

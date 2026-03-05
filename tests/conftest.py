@@ -1,22 +1,59 @@
 import pytest
-from datetime import datetime
 import struct
 import numpy as np
+import cv2
+from pyleem.roi import LineROI
+
+
+def set_start_voltage(metadata_bytes, voltage):
+    """Return a copy of metadata_bytes with the Start Voltage tag replaced."""
+    return (
+        metadata_bytes[:-22]
+        + b"\x26Start Voltage1\x00"
+        + struct.pack("<f", voltage)
+        + b"\xff\xff"
+    )
+
+
+def create_xps_array(center=60, sigma=10):
+    """Create an example XPS image array (256x128 pixels)."""
+    img_array = np.zeros((256, 128), dtype=np.uint16)
+    x = np.arange(128)
+    peak = 500 * np.exp(-((x - center) ** 2) / (2 * sigma**2))
+    background = 100 + 100 / (1 + np.exp(0.06 * (x - center)))
+    img_array[0, :] = (peak + background).astype(np.uint16)
+    return img_array
+
+
+def create_sees_array(center=60, sigma=10):
+    """Create an example SEES image array (256x128 pixels)."""
+    sees_array = np.zeros((256, 128), dtype=np.uint16)
+    x = np.arange(128)
+    profile = 500 / (1 + np.exp(-(x - center) / sigma))
+    sees_array[0, :] = profile.astype(np.uint16)
+    return sees_array
+
+
+def create_noisy_array(seed=0):
+    """Create a low-signal noise image array (256x128 pixels)."""
+    noisy_array = np.zeros((256, 128), dtype=np.uint16)
+    noisy_array[0, :] = np.random.default_rng(seed).integers(0, 4, 128, dtype=np.uint16)
+    return noisy_array
 
 
 @pytest.fixture
 def header_bytes():
     header = (
         b"UKSOFT2001\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00h\x00\t\x00\x10"
-        b"\x01\x10\x00\x00\x00\xb4\x04\x11\x00\x00\x00\x00\x00\x00\x00\x80"
+        b"\x01\x10\x00\x00\x00\x04\x04\x11\x00\x00\x00\x00\x00\x00\x00\x80"
         b"\x00\x00\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         b"\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00 \x01"
-        b"\x07\x00\x01\x00\xbb\x01\x80\xb6rl\xdd \xdb\x11\x00\x01\x00\x00\x00"
-        b"\x00\x16\x00\x00\x00\xd0\x07"
+        b"\x07\x00\x01\x00\xbb\x01"
+        b"\x00\x00\x81\x92\xb1z\xdc\x01"
+        b"\x00\x01\x00\x00\x00\x00\x16\x00\x00\x00\xd0\x07"
     )
-
     return header
 
 
@@ -42,30 +79,29 @@ def header_parsed():
 
     return {
         "filetype": "UKSOFT2001",
-        "file_header_size": 104,
-        "file_version": 9,
-        "bits_per_pixel": 272,
-        "camera_bits_per_pixel": 16,
-        "MCP_diam": 0,
-        "hbinning": 1204,
-        "vbinning": 17,
-        "width": 128,
-        "height": 256,
-        "no_images": 1,
-        "attachedrecipesize": 0,
+        "FileSize": 104,
+        "FileVersion": 9,
+        "BitsPerPixel": 272,
+        "CameraBitsPerPixel": 16,
+        "MCPDiameterInPixels": 0,
+        "HorizontalBinning": 4,
+        "VerticalBinning": 4,
+        "ImageWidth": 128,
+        "ImageHeight": 256,
+        "NrImages": 1,
+        "attachedRecipeSize": 0,
         "recipe": None,
-        "img_header_size": 288,
-        "img_version": 7,
-        "colorscale_low": 1,
-        "colorscale_high": 443,
-        "timestamp": "5678/04/04 15:03:12.372681",
-        "mask_xshift": 256,
-        "mask_yshift": 0,
-        "usemask": 0,
-        "attachedmarkedsize": 22,
-        "marked_header_size": 128,
+        "ImageSize": 288,
+        "ImageVersion": 7,
+        "ColorScaleLow": 1,
+        "ColorScaleHigh": 443,
+        "ImageTime": "2026/01/01 00:00:00.000000",
+        "MaskXShift": 256,
+        "MaskYShift": 0,
+        "RotateMask": 0,
+        "attachedMarkupSize": 22,
         "spin": 0,
-        "img_meta_size": 2000,
+        "LEEMdataVersion": 2000,
     }
 
 
@@ -86,29 +122,134 @@ def metadata_bytes(header_bytes):
         b"h\x00\x00\x00C\x10\x01"
         b"\xecECH\x00MTorr\x00\x00\x00\x00C"
         b"\xe4\x00\x00\x00C\x00\x00\x00C\xbeME5\x00\xf3O\xc3G"
-        b"nXPS\x00\x00\x00\x80Eq\x00\x00\x00\x00\xff\xff"
+        b"nXPS\x00\x00\x00\x80Eq\x00\x00\x00\x00"
+        b"\x26Start Voltage1\x00\x00\x00HC"
+        b"\xff\xff"
     )
 
     return header_bytes + empty_1 + marker + empty_2 + img_header
 
 
 @pytest.fixture
-def img_array():
-    """Create an example image array."""
-
-    return np.random.rand(256, 128).astype(np.uint16)
+def xps_array():
+    """Create an example XPS image array."""
+    return create_xps_array()
 
 
 @pytest.fixture
-def raw_file(tmp_path, metadata_bytes, img_array):
-    """Create a raw file.
+def noisy_array():
+    """Create a low-signal noise image array."""
+    return create_noisy_array()
 
-    The raw data has lenght of 2332 bytes.
-    """
-    raw_file = tmp_path / "test.raw"
-    # append filler
-    # append image bytes
-    img_bytes = img_array.tobytes()
-    raw_file.write_bytes(metadata_bytes + b"\xff" * 2000 + img_bytes)
 
+@pytest.fixture
+def sees_array():
+    """Create an example SEES image array."""
+    return create_sees_array()
+
+
+@pytest.fixture
+def xps_raw_file(tmp_path, metadata_bytes, xps_array):
+    """Create a single XPS raw file."""
+    raw_file = tmp_path / "test.dat"
+    raw_file.write_bytes(metadata_bytes + b"\xff" * 2000 + xps_array.tobytes())
     return raw_file
+
+
+@pytest.fixture
+def noisy_raw_file(tmp_path, metadata_bytes, noisy_array):
+    """Create a single low-signal noise raw file."""
+    raw_file = tmp_path / "test_noisy.dat"
+    raw_file.write_bytes(metadata_bytes + b"\xff" * 2000 + noisy_array.tobytes())
+    return raw_file
+
+
+@pytest.fixture
+def sees_raw_file(tmp_path, metadata_bytes, sees_array):
+    """Create a single SEES raw file."""
+    modified_metadata = set_start_voltage(metadata_bytes, 0.0)
+    sees_file = tmp_path / "test_sees.dat"
+    sees_file.write_bytes(modified_metadata + b"\xff" * 2000 + sees_array.tobytes())
+    return sees_file
+
+
+@pytest.fixture
+def leed_raw_file(tmp_path, metadata_bytes):
+    """Create a single LEED raw file with a circular pattern."""
+    image = np.zeros((256, 128), dtype=np.uint16)
+    cv2.circle(image, (64, 128), 40, 1000, -1)
+    leed_file = tmp_path / "test_leed.dat"
+    leed_file.write_bytes(metadata_bytes + b"\xff" * 2000 + image.tobytes())
+    return leed_file
+
+
+@pytest.fixture
+def xps_multiple_raw_files(tmp_path, metadata_bytes):
+    """Create multiple XPS raw files with different start voltages and timestamps."""
+    files = []
+
+    # timestamps 1 minute apart
+    image_times = [
+        b"\x00FD\xb6\xb1z\xdc\x01",
+        b"\x00\x8c\x07\xda\xb1z\xdc\x01",
+        b"\x00\xd2\xca\xfd\xb1z\xdc\x01",
+    ]
+    header_original = b"\x00\x00\x81\x92\xb1z\xdc\x01"
+
+    for i in range(3):
+        modified_metadata = set_start_voltage(metadata_bytes, 114.0 + i * 1.0)
+        modified_metadata = modified_metadata.replace(header_original, image_times[i])
+
+        raw_file = tmp_path / f"test_raw_{i}.dat"
+        raw_file.write_bytes(
+            modified_metadata[: len(metadata_bytes)]
+            + b"\xff" * 2000
+            + create_xps_array(center=80 - i * 16).tobytes()
+        )
+        files.append(raw_file)
+    return files
+
+
+@pytest.fixture
+def sees_multiple_raw_files(tmp_path, metadata_bytes):
+    """Create multiple SEES raw files with different start voltages."""
+    files = []
+
+    for i in range(3):
+        modified_metadata = set_start_voltage(metadata_bytes, 0.0 + i * 1.0)
+
+        sees_file = tmp_path / f"test_sees_{i}.dat"
+        sees_file.write_bytes(
+            modified_metadata
+            + b"\xff" * 2000
+            + create_sees_array(center=80 - i * 16).tobytes()
+        )
+        files.append(sees_file)
+    return files
+
+
+@pytest.fixture
+def leed_files(tmp_path, metadata_bytes):
+    """Create multiple LEED raw files with different circle radii."""
+    files = []
+
+    for i in range(3):
+        modified_metadata = set_start_voltage(metadata_bytes, 200.0 + i * 1.0)
+        image = np.zeros((256, 128), dtype=np.uint16)
+        cv2.circle(image, (64, 128), 30 + i * 10, 1000, -1)
+
+        leed_file = tmp_path / f"test_leed_{i}.dat"
+        leed_file.write_bytes(modified_metadata + b"\xff" * 2000 + image.tobytes())
+        files.append(leed_file)
+    return files
+
+@pytest.fixture
+def roi():
+    """Create an uncalibrated LineROI (vertical line, 128 pixels)."""
+    return LineROI(src=(0, 0), dst=(0, 127), linewidth=1)
+
+
+@pytest.fixture
+def roi_calibrated():
+    """Create a calibrated LineROI (16 px/eV, 8 eV range over 128 pixels)."""
+    return LineROI(src=(0, 0), dst=(0, 127), linewidth=1, pixel_per_ev=16, peak_shift=0)

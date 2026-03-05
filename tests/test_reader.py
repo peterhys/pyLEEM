@@ -1,174 +1,46 @@
 import pytest
-from pyleem.reader import RawReader
+from pyleem.reader import UViewReader
 import numpy as np
-import h5py
 
 
 @pytest.fixture
-def reader(raw_file):
-    """Create a reader from a raw file.
-
-    The raw data has lenght of 2332 bytes.
-    """
-
-    user_tags = {
-        104: [("expo", "<f", "s"), ("avg", "<Bc", "")],
-        228: [("X", "<f", "m"), ("Y", "<f", "m")],
-    }
-    return RawReader(raw_file, metasize=2500, user_tags=user_tags, read_img=True)
+def reader(xps_raw_file):
+    """Create a reader from a raw file."""
+    return UViewReader(xps_raw_file)
 
 
-@pytest.fixture
-def img_metadata_parsed():
-    """Return the parsed image metadata."""
-
-    return {
-        "AL": ("Invalid", "mA", 203),
-        "ALE": (128.0, "V", 210),
-        "avg": (16, "", 104),
-        "expo": (128.0, "s", 104),
-        "ECH": (128.0, "MTorr", 236),
-        "ME": ("Local", "K", 190),
-        "X": (128.0, "m", 228),
-        "Y": (128.0, "m", 228),
-        "Preset (FOV):": ("XPS", "", 110),
-    }
+def test_reader_metadata(reader):
+    """Test reader metadata."""
+    assert len(reader.metabytes) == UViewReader.METASIZE
+    assert reader.metadata["AL"][0] == "invalid"
+    assert reader.metadata["Camera Average"][0] == 16
+    assert reader.metadata["ALE"][0] == 128.0
+    assert reader.metadata["AL"][1] == "mA"
+    assert reader.metadata["ALE"][1] == "V"
+    assert reader.metadata["Camera Average"][1] is None
 
 
-def test_reader_size(reader):
-    """Test the length of the bytes."""
-
-    assert len(reader.metabytes) == 2500
-
-
-def test_header(reader, header_parsed):
-    """Test the header."""
-
-    assert reader.header == header_parsed
+def test_reader_read_image(reader, xps_array):
+    """Test reader read_image method."""
+    image = reader.read_image()
+    assert np.array_equal(image, xps_array)
 
 
-def test_imgmeta(reader, img_metadata_parsed):
-    """Test the image metadata."""
-
-    assert reader.imgmeta == img_metadata_parsed
-
-
-def test_imgmeta_df(reader):
-    """Test the image metadata dataframe."""
-
-    assert reader.imgmeta_df.loc["AL", "value"] == "Invalid"
-    assert reader.imgmeta_df.loc["avg", "unit"] == ""
-    assert reader.imgmeta_df.loc["ME", "tag"] == 190
+def test_reader_read_profile(reader, xps_array, roi):
+    """Test reader read_profile method."""
+    profile = reader.read_profile(roi)
+    assert len(profile) == 128 and isinstance(profile, np.ndarray)
+    assert np.array_equal(profile, xps_array[0, :])
 
 
-def test_subset_values(reader):
-
-    values = reader.subset_values(["ALE", "AL", "ME"])
-    assert values == [128.0, "Invalid", "Local"]
-
-
-def test_subset_units(reader):
-    """Test extract the units."""
-
-    keys = ["ALE", "AL", "ME"]
-    units = reader.subset_units(keys)
-    assert units == ["V", "mA", "K"]
-
-
-def test_list_headers(reader, header_parsed):
-    """Test header keys."""
-
-    assert sorted(reader.list_headers()) == sorted(list(header_parsed.keys()))
-
-
-def test_list_metadata(reader, img_metadata_parsed):
-    """Test metadata keys."""
-
-    assert sorted(reader.list_metadata()) == sorted(list(img_metadata_parsed.keys()))
-
-
-def test_image_array(reader, img_array):
-    """Test the image array."""
-
-    assert np.array_equal(reader.img, img_array)
-
-
-def test_image_false(tmp_path, metadata_bytes):
-    """Test the image array if img_read is False."""
-
-    raw_file = tmp_path / "test.raw"
-    # append filler
-    raw_file.write_bytes(metadata_bytes + b"\xff" * 2000)
-
-    reader = RawReader(raw_file, metasize=2000, read_img=False)
-
-    assert reader.img is None
-
-
-def test_comparison_less_than(tmp_path, metadata_bytes):
-    """Test the equality comparison of RawReader instances."""
-    raw_file1 = tmp_path / "test_equal_01.raw"
+def test_reader_comparison_and_repr(tmp_path, metadata_bytes, xps_raw_file, reader):
+    """Test reader __lt__ and __repr__ methods."""
+    raw_file1 = tmp_path / "test_01.dat"
+    raw_file2 = tmp_path / "test_02.dat"
     raw_file1.write_bytes(metadata_bytes + b"\xff" * 2000)
-
-    reader1 = RawReader(raw_file1, metasize=2500, read_img=False)
-
-    raw_file2 = tmp_path / "test_equal_02.raw"
     raw_file2.write_bytes(metadata_bytes + b"\xff" * 2000)
 
-    reader2 = RawReader(raw_file2, metasize=2500, read_img=False)
-
+    reader1 = UViewReader(raw_file1)
+    reader2 = UViewReader(raw_file2)
     assert reader1 < reader2
-
-
-def test_repr(reader, raw_file):
-    """Test the representation of the reader."""
-
-    assert repr(reader) == f"RawReader({raw_file})"
-
-
-def test_to_h5(reader, tmp_path):
-    """Test the writing of the reader to a HDF5 file."""
-
-    h5_file = tmp_path / "test.h5"
-    with h5py.File(h5_file.as_posix(), "w") as f:
-        reader.to_h5(f, write_img=True)
-
-    with h5py.File(h5_file, "r") as f:
-        group = f["test"]
-        assert group.attrs["timestamp"] == reader.header["timestamp"]
-        assert "image" in group
-        assert np.array_equal(group["image"], reader.img)
-
-        for key, value in reader.imgmeta.items():
-            assert group["image"].attrs[key] == value[0]
-            assert group["image"].attrs[key + "_unit"] == value[1]
-
-    with h5py.File(h5_file.as_posix(), "w") as f:
-        reader.to_h5(f, write_img=False)
-
-    with h5py.File(h5_file, "r") as f:
-        group = f["test"]
-        assert "image" in group
-        assert not np.array_equal(group["image"], reader.img)
-
-        for key, value in reader.imgmeta.items():
-            assert group["image"].attrs[key] == value[0]
-            assert group["image"].attrs[key + "_unit"] == value[1]
-
-
-def test_custom_h5(tmp_path, raw_file):
-    """Test the custom HDF5 method."""
-
-    h5_file = tmp_path / "test.h5"
-
-    class CustomReader(RawReader):
-        def custom_h5(self, group):
-            group.attrs.update({"custom": "custom"})
-
-    reader = CustomReader(raw_file, metasize=2500, read_img=False)
-    with h5py.File(h5_file, "w") as f:
-        reader.to_h5(f)
-
-    with h5py.File(h5_file, "r") as f:
-        group = f["test"]
-        assert group.attrs["custom"] == "custom"
+    assert repr(reader) == f"UViewReader({xps_raw_file})"
