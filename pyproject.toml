@@ -1,94 +1,76 @@
-[tool.poetry]
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
 name = "pyleem"
-version = "0.0.1"
-description = "LEEM experiment analysis tool"
+version = "0.1.0"
+description = "Low Energy Electron Microscopy data analysis toolkit"
 readme = "README.md"
-license = "GPL-3.0"
-authors = ["Peter Sun <hs859@cornell.edu>>"]
-maintainers = ["Peter Sun <hs859@cornell.edu>"]
-repository = "https://github.com/peterhs73/PyLEEM"
-packages = [{ include = "pyleem" }]
+license = { text = "GPL-3.0" }
+authors = [{ name = "Peter Sun", email = "hs859@cornell.edu" }]
+maintainers = [{ name = "Peter Sun", email = "hs859@cornell.edu" }]
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Intended Audience :: Researchers",
+    "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
 ]
+dependencies = [
+    "numpy>=2",
+    "scikit-image>=0.24.0",
+    "matplotlib>=3.9.0",
+    "roifile==2024.9.15",
+    "lmfit>=1.3.2",
+    "opencv-python>=4.12.0",
+    "tomlkit>=0.12"
+]
 
+[project.optional-dependencies]
+test = ["pytest>=9.0.2", "pytest-cov>=7.0.0", "coverage>=7.13.4"]
+docs = [
+    "sphinx>=9.0.4",
+    "sphinx-book-theme>=1.1.4"
+]
 
-[build-system]
-requires = ["poetry_core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[project.urls]
+Repository = "https://github.com/peterhys/PyLEEM"
 
-[tool.poetry.dependencies]
-python = ">=3.10"
-numpy = ">=2"
-scikit-image = ">=0.24.0"
-pandas = ">=2.2.0"
-matplotlib = ">=3.9.0"
-roifile = "2024.9.15"
-lmfit = ">=1.3.2"
-h5py = ">=3.12.0"
-tox = { version = ">=3.24.5", optional = true }
-tox-conda = { version = ">=0.9.2", optional = true}
-pytest = { version = ">=7.1.1", optional = true }
-pytest-cov = { version = ">=3.0.0", optional = true }
-sphinx = { version = "^6.1.3", optional = true }
-sphinx-book-theme = { version = "=1.0.0", optional = true }
-pydata-sphinx-theme = { version = "=0.13.1", optional = true } 
-nbsphinx = { version = "=0.9.1", optional = true }
+[tool.setuptools]
+packages = ["pyleem"]
 
-[tool.poetry.extras]
-test = ["pytest", "pytest-cov"]
-docs = ["nbsphinx", "sphinx", "sphinx_book_theme", "pydata-sphinx-theme"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.coverage.run]
-# pytest coverage
-source_pkgs = ['nanoir']
-omit = ['tests/*']
+source_pkgs = ["pyleem"]
+omit = ["tests/*"]
 
 [tool.tox]
-legacy_tox_ini = """
-[tox]
-envlist = py310, py311, py312, coverage
-isolated_build = True
+env_list = ["py311", "py312", "coverage", "docs"]
 
-[gh-actions]
-python =
-    3.10: py310, docs
-    3.11: py311, docs
-    3.12: py312, docs
+[tool.tox.env_run_base]
+package = "wheel"
+extras = ["test"]
+commands = [["pytest"]]
 
-[testenv:py310]
-deps =
-    pytest >= 7.1.1
-commands = pytest
+[tool.tox.env.coverage]
+package = "wheel"
+extras = ["test"]
+commands = [["pytest", "--cov=pyleem", "--cov-report=html"]]
 
-[testenv:py311]
-deps =
-    pytest >= 7.1.1
-commands = pytest
-
-[testenv:py312]
-deps =
-    pytest >= 7.1.1
-commands = pytest
-
-[testenv:coverage]
-deps = 
-    pytest >= 7.1.1
-    pytest-cov >= 3.0.0
-commands =
-    coverage run --source=tests -m pytest
-    coverage html
-    coverage report
-
-[testenv:docs]
-deps = 
-    sphinx == 6.1.3
-    sphinx-book-theme >=1.0.0
-    nbsphinx == 0.9.1
-    pydata-sphinx-theme == 0.13.1
-commands =
-    # sphinx-build -W -b html ./docs ./docs/_build/html
-    sphinx-build -W -b html -d "{toxworkdir}/docs" docs "{toxinidir}/docs/_build/html"
-"""
+[tool.tox.env.docs]
+package = "wheel"
+extras = ["docs"]
+commands = [
+    [
+        "sphinx-build",
+        "-W",
+        "-b",
+        "html",
+        "-d",
+        "{work_dir}/docs",
+        "docs",
+        "{tox_root}/docs/_build/html"
+    ]
+]
