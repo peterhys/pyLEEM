@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Change 'amorphleed' module to 'desp' module to more accurate describe the diffuse elastic scattering
   pattern measurement
+- Analyzer reader class moved to class attribute.
+- Combine analyzer class and profileanalzyer class.
 
 ## [0.1.0]
 

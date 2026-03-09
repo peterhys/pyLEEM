@@ -7,22 +7,26 @@ from pyleem.utils import find_stitch_points, stitch_profiles, find_onset
 
 
 class Analyzer:
-    """Base class for LEEM file analysis.
+    """Base analyzer class for LEEM data analysis.
 
     Provides core functionality for analyzing LEEM data files using
     UViewReader to access metadata and image data.
+    To use a different reader class, subclass the Analyzer and
+    redefine the READER_CLS attribute.
 
     :param str or Path path: Path to LEEM data file.
-
     :ivar Path path: Path to data file.
     :ivar str name: Filename without extension.
     :ivar UViewReader reader: Reader instance for accessing file data.
     """
 
-    def __init__(self, path):
+    READER_CLS = UViewReader
+
+    def __init__(self, path, **kwargs):
         self.path = path
         self.name = os.path.splitext(os.path.basename(path))[0]
-        self.reader = UViewReader(path)
+        self.reader = self.READER_CLS(path)
+        self.__dict__.update(kwargs)
 
     @property
     def metadata(self):
@@ -67,25 +71,18 @@ class ProfileAnalyzer(Analyzer):
     :ivar ndarray ordinate: Y-axis values (intensity or processed values).
     """
 
-    def __init__(self, path, roi, scale=1, **kwargs):
+    def __init__(self, path, roi, **kwargs):
         super().__init__(path)
 
-        self.scale = scale
-        self.profile = self.reader.read_profile(roi) * scale
+        self.profile = self.reader.read_profile(roi)
         self.pixel = np.arange(len(self.profile))
         self.roi = roi
-
         self.__dict__.update(kwargs)
 
         self.preprocess()
 
-        if self.roi.is_calibrated:
-            self.abscissa, self.abscissa_label = self.transform_abscissa()
-            self.ordinate, self.ordinate_label = self.transform_ordinate()
-
-        else:
-            self.abscissa, self.abscissa_label = self.pixel, "Pixel"
-            self.ordinate, self.ordinate_label = self.profile, "Intensity"
+        self.abscissa, self.abscissa_label = self.transform_abscissa()
+        self.ordinate, self.ordinate_label = self.transform_ordinate()
 
         self.postprocees()
 
