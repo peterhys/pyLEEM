@@ -1,5 +1,6 @@
 from roifile import ImagejRoi, ROI_TYPE
 import numpy as np
+import skimage
 
 
 class LineROI:
@@ -36,7 +37,12 @@ class LineROI:
             self.dst = (roif.y2, roif.x2)
             self.linewidth = roif.stroke_width
         else:
-            assert "src" in kwargs and "dst" in kwargs and "linewidth" in kwargs
+            assert (
+                "src" in kwargs and "dst" in kwargs and "linewidth" in kwargs
+            ), "src, dst, and linewidth must be provided if roi_file is not"
+            self.src = kwargs["src"]
+            self.dst = kwargs["dst"]
+            self.linewidth = kwargs["linewidth"]
         self.order = 1
         self.mode = "nearest"
         self.cval = 0
@@ -52,6 +58,15 @@ class LineROI:
         """
         keys = ["src", "dst", "linewidth", "order", "mode", "cval", "reduce_func"]
         return {key: getattr(self, key) for key in keys}
+
+    def read_profile(self, image):
+        """Read line profile from image.
+
+        :param ndarray image: Input image.
+        :return: Line profile.
+        :rtype: ndarray
+        """
+        return skimage.measure.profile_line(image, **self.to_dict())
 
     def to_roifile(self, file):
         """Save ROI to ImageJ-compatible file.

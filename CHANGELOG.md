@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analyzer reader class moved to class attribute.
 - Move the calibration output the analyzer group for a cleaner logic. Both domain analyer and
   analyer group requires calibration parameters.
+- Change `filtered_profile` method to `process_profile`
 
 
 ## [0.1.1]

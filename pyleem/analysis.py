@@ -36,10 +36,14 @@ class Analyzer:
         """Enable sorting by file path."""
         return self.path < other.path
 
+    def read_image(self):
+        """Read the image from the reader."""
+        return self.reader.read_image()
+
     @property
     def image(self):
         """Return the image data from the reader."""
-        return self.reader.read_image()
+        return self.read_image()
 
     def plot_image(self, ax=None):
         """Plot the raw image data.
@@ -73,10 +77,9 @@ class ProfileAnalyzer(Analyzer):
     def __init__(self, path, roi):
         super().__init__(path)
 
-        self.profile = self.reader.read_profile(roi)
-        self.pixel = np.arange(len(self.profile))
         self.roi = roi
-
+        self._profile = self.read_profile()
+        self.pixel = np.arange(len(self.profile))
         self._abscissa, self._abscissa_label = self.pixel, "Pixel"
         self._ordinate, self._ordinate_label = self.profile, "Intensity"
 
@@ -100,8 +103,20 @@ class ProfileAnalyzer(Analyzer):
         """Return the ordinate label."""
         return self._ordinate_label
 
-    def filtered_profile(self, sigma):
-        """Apply Gaussian filtering to the profile.
+    def read_profile(self):
+        """Read the profile from the image."""
+        return self.roi.read_profile(self.image)
+
+    @property
+    def profile(self):
+        """Return the profile.
+
+        Unlike image, profile is pre-computed.
+        """
+        return self._profile
+
+    def process_profile(self, sigma):
+        """Default profile filtering method.
 
         :param float sigma: Standard deviation for Gaussian kernel.
         :return: Filtered profile.

@@ -17,13 +17,6 @@ class Reader(ABC):
         """Read and return image data from file."""
         pass
 
-    @abstractmethod
-    def read_profile(self, roi):
-        """Extract profile data from image.
-
-        :param dict or LineROI roi: Region of interest.
-        """
-        pass
 
     @abstractmethod
     def __lt__(self, other):
@@ -81,14 +74,6 @@ class UViewReader(Reader):
             img = np.frombuffer(f.read(), dtype=dt).reshape(height, width)
         return img
 
-    def read_profile(self, roi):
-        """Extract profile data from the image.
-
-        :param dict or LineROI roi: Region of interest.
-        :return: Profile array.
-        :rtype: ndarray
-        """
-        return skimage.measure.profile_line(self.read_image(), **roi.to_dict())
 
     def __lt__(self, other):
         """Enable sorting by file path."""

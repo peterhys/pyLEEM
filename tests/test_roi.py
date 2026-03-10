@@ -51,3 +51,10 @@ def test_to_roifile(tmp_path):
     assert roif_out.x1 == 0 and roif_out.y1 == 0
     assert roif_out.x2 == 9 and roif_out.y2 == 9
     assert roif_out.stroke_width == 1
+
+
+def test_roi_read_profile(xps_array, roi):
+    """Test reader read_profile method."""
+    profile = roi.read_profile(xps_array)
+    assert len(profile) == 128 and isinstance(profile, np.ndarray)
+    assert np.array_equal(profile, xps_array[0, :])

@@ -41,9 +41,9 @@ class SEESAnalyzer(ProfileAnalyzer):
         super().__init__(path, roi)
 
         self.sigma = sigma
-        filtered_profile = self.filtered_profile(self.sigma)
+        processed_profile = self.process_profile(sigma)
 
-        self.pk_idx, self.slope, self.onset_pos = SEES_onset(filtered_profile)
+        self.pk_idx, self.slope, self.onset_pos = SEES_onset(processed_profile)
         self.KE = (self.pixel - self.onset_pos) / pixel_per_ev
 
         self._abscissa, self._abscissa_label = self.KE, "Energy [eV]"
@@ -85,7 +85,7 @@ def calibrate_sees(analyzers, cal_params=None, plot=False):
     onset_pos = []
     start_voltages = []
     for analyzer in analyzers:
-        onset_pos.append(SEES_onset(analyzer.filtered_profile(sigma))[2])
+        onset_pos.append(SEES_onset(analyzer.process_profile(sigma))[2])
         start_voltages.append(analyzer.metadata["Start Voltage"][0])
     
     onset_pos = np.array(onset_pos)

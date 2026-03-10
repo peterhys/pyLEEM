@@ -26,13 +26,6 @@ def test_reader_read_image(reader, xps_array):
     assert np.array_equal(image, xps_array)
 
 
-def test_reader_read_profile(reader, xps_array, roi):
-    """Test reader read_profile method."""
-    profile = reader.read_profile(roi)
-    assert len(profile) == 128 and isinstance(profile, np.ndarray)
-    assert np.array_equal(profile, xps_array[0, :])
-
-
 def test_reader_comparison_and_repr(tmp_path, metadata_bytes, xps_raw_file, reader):
     """Test reader __lt__ and __repr__ methods."""
     raw_file1 = tmp_path / "test_01.dat"
