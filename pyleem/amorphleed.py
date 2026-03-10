@@ -53,7 +53,7 @@ def get_radius(image):
     largest_contour = max(contours, key=cv2.contourArea)
     # Get center from minimum enclosing circle
     (x, y), radius = cv2.minEnclosingCircle(largest_contour)
-    return int(x), int(y), int(radius)
+    return x, y, radius
 
 
 class AmorphLEEDAnalyzer(Analyzer):
