@@ -22,11 +22,10 @@ class Analyzer:
 
     READER_CLS = UViewReader
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path):
         self.path = path
         self.name = os.path.splitext(os.path.basename(path))[0]
         self.reader = self.READER_CLS(path)
-        self.__dict__.update(kwargs)
 
     @property
     def metadata(self):
@@ -48,7 +47,7 @@ class Analyzer:
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
         """
         ax = ax or plt.gca()
-        ax.imshow(self.image)
+        ax.imshow(self.image, label=self.name)
         ax.set_xlabel("X (pixels)")
         ax.set_ylabel("Y (pixels)")
         ax.set_title("Raw Image Data")
@@ -71,65 +70,35 @@ class ProfileAnalyzer(Analyzer):
     :ivar ndarray ordinate: Y-axis values (intensity or processed values).
     """
 
-    def __init__(self, path, roi, **kwargs):
+    def __init__(self, path, roi):
         super().__init__(path)
 
         self.profile = self.reader.read_profile(roi)
         self.pixel = np.arange(len(self.profile))
         self.roi = roi
-        self.__dict__.update(kwargs)
 
-        self.preprocess()
-
-        self.abscissa, self.abscissa_label = self.transform_abscissa()
-        self.ordinate, self.ordinate_label = self.transform_ordinate()
-
-        self.postprocees()
-
-    def preprocess(self):
-        """Preprocess the profile data.
-
-        Override in subclasses.
-
-        """
-        return
-
-    def postprocees(self):
-        """Postprocess the profile data.
-
-        Override in subclasses for custom postprocessing.
-        """
-        return
-
-    def __add__(self, other):
-        """Add two profiles.
-
-        The method allows to add two analyzer together to create
-        a new object with limited attributes. The added profiles
-        need to be the same class and have the same labels for
-        the abscissa. The result object is for analysis only,
-        no metadata or any original attributes are preserved.
-        """
-        return self.profile + other.profile
+        self._abscissa, self._abscissa_label = self.pixel, "Pixel"
+        self._ordinate, self._ordinate_label = self.profile, "Intensity"
 
     @property
-    def is_calibrated(self):
-        """Check whether analyzer is calibrated."""
-        return self.roi.is_calibrated
+    def abscissa(self):
+        """Return the abscissa values."""
+        return self._abscissa
 
-    def transform_abscissa(self):
-        """Transform pixel coordinates to calibrated units.
+    @property
+    def ordinate(self):
+        """Return the ordinate values."""
+        return self._ordinate
 
-        Override in subclasses for custom transformations.
-        """
-        return self.pixel, "Pixel"
+    @property
+    def abscissa_label(self):
+        """Return the abscissa label."""
+        return self._abscissa_label
 
-    def transform_ordinate(self):
-        """Transform intensity values to processed units.
-
-        Override in subclasses for custom transformations.
-        """
-        return self.profile, "Intensity"
+    @property
+    def ordinate_label(self):
+        """Return the ordinate label."""
+        return self._ordinate_label
 
     def filtered_profile(self, sigma):
         """Apply Gaussian filtering to the profile.
@@ -146,16 +115,12 @@ class ProfileAnalyzer(Analyzer):
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
         """
 
-        if ax is None:
-            fig, ax = plt.subplots()
+        ax = ax or plt.gca()
+        ax.plot(self.abscissa, self.ordinate, label=self.name)
+        ax.set_xlabel(self.abscissa_label)
+        ax.set_ylabel(self.ordinate_label)
 
-        ax.plot(self.abscissa, self.ordinate, label="Profile")
-
-        if ax is None:
-            ax.set_xlabel(self.abscissa_label)
-            ax.set_ylabel(self.ordinate_label)
-            ax.legend()
-            fig.show()
+        return ax
 
 
 class StitchAnalyzer:
@@ -247,11 +212,6 @@ class StitchAnalyzer:
             f"'{type(self).__name__}' object has no attribute '{name}'"
         )
 
-    @property
-    def is_calibrated(self):
-        """Check whether analyzer is calibrated."""
-        return self.analyzers[0].is_calibrated
-
 
 class AnalyzerGroup:
     """Base class for batch analysis of multiple LEEM files.
@@ -268,20 +228,14 @@ class AnalyzerGroup:
     :ivar list time_intervals: Time intervals in seconds from first acquisition.
     """
 
-    def __init__(self, paths, analyzer=Analyzer, **kwargs):
-        if not paths:
-            raise ValueError("paths cannot be empty")
+    def __init__(self, analyzers):
 
-        self.paths = paths
-        self.analyzer = analyzer
-
-        self.__dict__.update(kwargs)
-        self.analyzers = [self.analyzer(path, **kwargs) for path in paths]
+        self.analyzers = analyzers
         self.time_intervals = self.get_time_intervals()
 
     def __len__(self):
         """Return the number of analyzers in the group."""
-        return len(self.paths)
+        return len(self.analyzers)
 
     def __iter__(self):
         """Iterate over the analyzers in the group."""
@@ -333,9 +287,9 @@ class AnalyzerGroup:
         :rtype: int
         """
 
-        if hasattr(self.analyzer, "profile"):
+        try:
             profiles = self.get_attrs("profile")
-        else:
+        except AttributeError:
             profiles = [analyzer.image.sum() for analyzer in self.analyzers]
 
         return find_onset(profiles)

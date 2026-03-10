@@ -43,13 +43,6 @@ class LineROI:
         self.reduce_func = np.mean
         self.__dict__.update(kwargs)
 
-        if "pixel_per_ev" in kwargs and "peak_shift" in kwargs:
-            self.calibrate(kwargs["pixel_per_ev"], kwargs["peak_shift"])
-        else:
-            self._is_calibrated = False
-            self.pixel_per_ev = None
-            self.peak_shift = None
-
     def to_dict(self):
         """Convert ROI to dictionary for skimage.measure.profile_line.
 
@@ -59,27 +52,6 @@ class LineROI:
         """
         keys = ["src", "dst", "linewidth", "order", "mode", "cval", "reduce_func"]
         return {key: getattr(self, key) for key in keys}
-
-    def calibrate(self, pixel_per_ev, peak_shift, **kwargs):
-        """Calibrate ROI parameters.
-
-        :param float pixel_per_ev: Pixel per eV conversion factor.
-        :param float peak_shift: Peak shift in pixels.
-        :param kwargs: Additional calibration attributes to set on the instance.
-        """
-        self.pixel_per_ev = pixel_per_ev
-        self.peak_shift = peak_shift
-        self.__dict__.update(kwargs)
-        self._is_calibrated = True
-
-    @property
-    def is_calibrated(self):
-        """Check whether ROI is calibrated.
-
-        :return: ``True`` if calibration parameters have been set.
-        :rtype: bool
-        """
-        return self._is_calibrated
 
     def to_roifile(self, file):
         """Save ROI to ImageJ-compatible file.

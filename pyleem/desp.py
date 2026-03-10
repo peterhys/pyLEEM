@@ -43,7 +43,7 @@ def get_radius(image):
 
     :param ndarray image: Preprocessed DESP image (uint8).
     :return: Circle center (x, y) and radius in pixels.
-    :rtype: tuple(int, int, int)
+    :rtype: tuple(float, float, float)
     """
 
     denoised = cv2.bilateralFilter(image, 15, 100, 100)
@@ -53,7 +53,34 @@ def get_radius(image):
     largest_contour = max(contours, key=cv2.contourArea)
     # Get center from minimum enclosing circle
     (x, y), radius = cv2.minEnclosingCircle(largest_contour)
-    return int(x), int(y), int(radius)
+    return x, y, radius
+
+
+def calibrate_desp(analyzers, cal_params=None, plot=False):
+    """Create radius-to-voltage calibration function.
+
+    Uses linear interpolation to map pattern radii to electron energies.
+
+    :return: Interpolation function mapping radius to voltage (voltage_map).
+    :rtype: dict
+    """
+    cal_params = cal_params or {}
+    radii = []
+    start_voltages = []
+    for analyzer in analyzers:
+        image = preprocess_image(analyzer.image)
+        x, y, radius = get_radius(image)
+        radii.append(radius)
+        start_voltages.append(analyzer.metadata["Start Voltage"][0])
+
+    interp_func = interp1d(
+        radii,
+        start_voltages,
+        kind="linear",
+        bounds_error=False,
+        fill_value="extrapolate",
+    )
+    return {"potential_func": interp_func}
 
 
 class DESPAnalyzer(Analyzer):
@@ -65,20 +92,20 @@ class DESPAnalyzer(Analyzer):
     :param str or Path path: Path to LEEM data file.
     :param callable interp_func: Interpolation function for radius-to-potential conversion.
 
-    :ivar int x: X-coordinate of circle center.
-    :ivar int y: Y-coordinate of circle center.
-    :ivar int radius: Circle radius in pixels.
+    :ivar float x: X-coordinate of circle center.
+    :ivar float y: Y-coordinate of circle center.
+    :ivar float radius: Circle radius in pixels.
     :ivar float potential: Surface potential if interpolation function provided.
     """
 
-    def __init__(self, path, interp_func=None):
+    def __init__(self, path, potential_func):
+        assert callable(potential_func), "potential_func must be a callable"
         super().__init__(path)
 
         self.x, self.y, self.radius = get_radius(self.processed_image)
 
-        if interp_func is not None:
-            self.potential = interp_func(self.radius).item()
-            self.interp_func = interp_func
+        self.potential = potential_func(self.radius)
+        self.potential_func = potential_func
 
     @property
     def processed_image(self):
@@ -108,25 +135,12 @@ class DESPGroup(AnalyzerGroup):
     :param kwargs: Additional keyword arguments for AnalyzerGroup.
     """
 
-    def __init__(self, paths, **kwargs):
-        super().__init__(paths, analyzer=DESPAnalyzer, **kwargs)
+    def __init__(self, paths, potential_func):
+        assert len(paths) > 0, "Paths cannot be empty"
 
-    def calibrate(self):
-        """Create radius-to-voltage calibration function.
-
-        Uses linear interpolation to map pattern radii to electron energies.
-
-        :return: Interpolation function mapping radius to voltage.
-        :rtype: callable
-        """
-        interp_func = interp1d(
-            self.get_attrs("radius"),
-            self.get_metas("Start Voltage"),
-            kind="linear",
-            bounds_error=False,
-            fill_value="extrapolate",
-        )
-        return interp_func
+        self.analyzers = [DESPAnalyzer(path, potential_func) for path in paths]
+        self.potential_func = potential_func
+        super().__init__(self.analyzers)
 
     def plot_potential(self, ax):
         """Plot the potential vs. time.

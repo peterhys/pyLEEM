@@ -54,29 +54,3 @@ def write_config_result(config_path, cal_result):
 
     with open(config_path, "w") as f:
         tomlkit.dump(config, f)
-
-
-def calibrate_profile_config(config_path, analyzer_group, reset=True, plot=False):
-    """Calibrate line profile analyzer group using configuration file.
-
-    :param str or Path config_path: Path to configuration file.
-    :param type analyzer_group: Analyzer group class to calibrate.
-    :param bool reset: Whether to recalculate calibration.
-    :param bool plot: Whether to display calibration plots.
-    :return: Calibrated ROI object.
-    :rtype: LineROI
-    """
-
-    base_params, cal_params = read_config(config_path)
-    group = analyzer_group(**base_params)
-
-    if reset:
-        cal_result = group.calibrate(cal_params, plot=plot)
-        write_config_result(config_path, cal_result)
-    else:
-        cal_result = read_config_result(config_path)
-
-    roi = base_params["roi"]
-    roi.calibrate(**cal_result)
-
-    return roi

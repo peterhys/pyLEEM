@@ -31,49 +31,6 @@ def test_init_from_kwargs():
     assert roi.order == 2
 
 
-def test_calibrate():
-    """Test ROI calibration."""
-    roi = LineROI(src=(0, 0), dst=(9, 9), linewidth=1)
-
-    # Initially not calibrated
-    assert not roi.is_calibrated
-    assert roi.pixel_per_ev is None
-    assert roi.peak_shift is None
-
-    # Calibrate
-    roi.calibrate(pixel_per_ev=165.0, peak_shift=5.0, custom_param=42)
-
-    assert roi.is_calibrated
-    assert roi.pixel_per_ev == 165.0
-    assert roi.peak_shift == 5.0
-    assert roi.custom_param == 42
-
-
-def test_init_with_calibration_params():
-    """Test initialization with calibration parameters."""
-    roi = LineROI(
-        src=(0, 0), dst=(9, 9), linewidth=1, pixel_per_ev=165.0, peak_shift=5.0
-    )
-
-    # Should be automatically calibrated
-    assert roi.is_calibrated
-    assert roi.pixel_per_ev == 165.0
-    assert roi.peak_shift == 5.0
-
-
-def test_is_calibrated_property():
-    """Test is_calibrated property behavior."""
-    roi = LineROI(src=(0, 0), dst=(9, 9), linewidth=1)
-
-    # Check initial state
-    assert hasattr(roi, "is_calibrated")
-    assert not roi.is_calibrated
-
-    # After calibration
-    roi.calibrate(pixel_per_ev=165.0, peak_shift=5.0)
-    assert roi.is_calibrated
-
-
 def test_to_dict_method():
     """Test to_dict returns correct keys."""
     roi = LineROI(src=(0, 0), dst=(9, 9), linewidth=1)
@@ -82,12 +39,6 @@ def test_to_dict_method():
     # Check that only the profile_line keys are included
     expected_keys = ["src", "dst", "linewidth", "order", "mode", "cval", "reduce_func"]
     assert set(roi_dict.keys()) == set(expected_keys)
-
-    # Calibration params should NOT be in to_dict
-    roi.calibrate(pixel_per_ev=165.0, peak_shift=10.0)
-    roi_dict = roi.to_dict()
-    assert "pixel_per_ev" not in roi_dict
-    assert "peak_shift" not in roi_dict
 
 
 def test_to_roifile(tmp_path):

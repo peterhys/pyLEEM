@@ -234,14 +234,15 @@ def desp_files(tmp_path, metadata_bytes):
     files = []
 
     for i in range(3):
-        modified_metadata = set_start_voltage(metadata_bytes, 200.0 + i * 1.0)
+        modified_metadata = set_start_voltage(metadata_bytes, 200.0 + i * 10.0)
         image = np.zeros((256, 128), dtype=np.uint16)
-        cv2.circle(image, (64, 128), 30 + i * 10, 1000, -1)
+        cv2.circle(image, (64, 128), 20 + i * 20, 1000, -1)
 
         desp_file = tmp_path / f"test_desp_{i}.dat"
         desp_file.write_bytes(modified_metadata + b"\xff" * 2000 + image.tobytes())
         files.append(desp_file)
     return files
+
 
 @pytest.fixture
 def roi():
@@ -250,6 +251,18 @@ def roi():
 
 
 @pytest.fixture
-def roi_calibrated():
-    """Create a calibrated LineROI (16 px/eV, 8 eV range over 128 pixels)."""
-    return LineROI(src=(0, 0), dst=(0, 127), linewidth=1, pixel_per_ev=16, peak_shift=0)
+def pixel_per_ev():
+    """Create a pixel per eV function."""
+    return 16
+
+
+@pytest.fixture
+def peak_shift():
+    """Create a peak shift function."""
+    return 0
+
+
+@pytest.fixture
+def desp_potential_func():
+    """Create a potential function."""
+    return lambda x: 200 + (x - 20) * 0.5

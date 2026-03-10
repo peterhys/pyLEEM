@@ -180,36 +180,18 @@ class XPSAnalyzer(ProfileAnalyzer):
     :param float incident_voltage: X-ray beam energy.
     """
 
-    def __init__(self, path, roi, incident_voltage):
+    def __init__(self, path, roi, pixel_per_ev, peak_shift, incident_voltage):
 
-        super().__init__(path, roi, incident_voltage=incident_voltage)
+        super().__init__(path, roi)
 
         self.metadata["Incident Voltage"] = (incident_voltage, "eV")
 
-    def transform_abscissa(self):
-        """Transform to binding energy scale."""
-
-        BE = (
-            self.incident_voltage
-            - self.metadata["Start Voltage"][0]
-            - self.roi.peak_shift
-            - self.pixel / self.roi.pixel_per_ev
+        self.KE = (
+            self.metadata["Start Voltage"][0] + peak_shift + self.pixel / pixel_per_ev
         )
+        self.BE = incident_voltage - self.KE
 
-        return BE, "Binding Energy [eV]"
-
-    def postprocees(self):
-        """Postprocess the profile data."""
-        if self.is_calibrated:
-            self.KE = (
-                self.metadata["Start Voltage"][0]
-                + self.roi.peak_shift
-                + self.pixel / self.roi.pixel_per_ev
-            )
-            self.BE = self.incident_voltage - self.KE
-        else:
-            self.KE = None
-            self.BE = None
+        self._abscissa, self._abscissa_label = self.BE, "Binding Energy [eV]"
 
     def fit(self, num_peaks, baseline, peak_prominence=0.1):
         """Fit XPS spectrum with background subtraction.
@@ -264,6 +246,78 @@ class XPSAnalyzer(ProfileAnalyzer):
         ax_residual.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
 
+def calibrate_xps(analyzers, cal_params, plot=False):
+    f"""Calibrate pixel_per_eV conversion using multiple spectra.
+
+    Supports calibration with two or more files by analyzing peak
+    positions across different accelerating voltages.
+
+    :param dict cal_params: Dictionary with 'baselines', 'num_peaks', optional
+        'pixel_per_ev', 'peak_shift', 'ref_index', 'ref_value', 'peak_prominence'.
+    :param bool plot: Whether to display calibration plots.
+    :return: Calibration results (pixel_per_ev, peak_shift).
+    :rtype: dict
+    """
+
+    pixel_per_ev = cal_params.get("pixel_per_ev", None)
+    peak_shift = cal_params.get("peak_shift", None)
+
+    if pixel_per_ev is not None and peak_shift is not None:
+        return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}
+
+    baselines, num_peaks = cal_params["baselines"], cal_params["num_peaks"]
+    incident_voltage = cal_params["incident_voltage"]
+    peak_prominence = cal_params.get("peak_prominence", 0.1)
+
+    bgs = []
+    results = []
+    peak_results = []
+
+    for i, analyzer in enumerate(analyzers):
+        constraints = parameter_contraint(analyzer.ordinate, num_peaks, peak_prominence)
+        peak_labels = [f"p{j}" for j in range(1, num_peaks + 1)]
+        result, bg = fit_xps(
+            analyzer.ordinate, analyzer.pixel, baselines[i], peak_labels, constraints
+        )
+        peaks = [v for k, v in result.best_values.items() if "_center" in k]
+        results.append(result)
+        peak_results.append(peaks)
+        bgs.append(bg)
+
+    start_voltages = np.array(
+        [analyzer.metadata["Start Voltage"][0] for analyzer in analyzers]
+    )
+    delta_ev = np.diff(start_voltages)
+
+    if pixel_per_ev is None:
+        # Average over the peaks (the peak splitting should remain the same)
+        peak_diff = np.diff(peak_results, axis=0).mean(axis=1)
+        pixel_per_ev = np.mean(peak_diff / -delta_ev)
+
+    ref_index, ref_value = cal_params.get("ref_index", None), cal_params.get(
+        "ref_value", None
+    )
+
+    if ref_index is None or ref_value is None:
+        # No reference peak adjustment
+        peak_shift = 0
+    else:
+        peak_pos = np.array(list(zip(*peak_results))[ref_index]) / pixel_per_ev
+
+        peak_shift = np.mean(incident_voltage - start_voltages - ref_value - peak_pos)
+
+    if plot:
+        _, axes = plt.subplots(
+            2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True
+        )
+        plt.subplots_adjust(hspace=0, wspace=0)
+        for i, analyzer in enumerate(analyzers):
+            analyzer.plot_fit(axes, results[i], bgs[i])
+        plt.show()
+
+    return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}
+
+
 class XPSGroup(AnalyzerGroup):
     """Batch analyzer for XPS spectra.
 
@@ -272,71 +326,12 @@ class XPSGroup(AnalyzerGroup):
     :param float incident_voltage: X-ray photon energy in eV.
     """
 
-    def __init__(self, paths, roi, incident_voltage):
-        super().__init__(
-            paths, analyzer=XPSAnalyzer, roi=roi, incident_voltage=incident_voltage
-        )
-
-    def calibrate(self, cal_params, plot=False):
-        """Calibrate pixel-to-eV conversion using multiple spectra.
-
-        Supports calibration with two or more files by analyzing peak
-        positions across different accelerating voltages.
-
-        :param dict cal_params: Dictionary with 'baselines', 'num_peaks', optional
-            'pixel_per_ev', 'peak_shift', 'ref_index', 'ref_value', 'peak_prominence'.
-        :param bool plot: Whether to display calibration plots.
-        :return: Calibration results (pixel_per_ev, peak_shift).
-        :rtype: dict
-        """
-
-        baselines, num_peaks = cal_params["baselines"], cal_params["num_peaks"]
-        peak_prominence = cal_params.get("peak_prominence", 0.1)
-
-        bgs = []
-        results = []
-        peak_results = []
-
-        for i, analyzer in enumerate(self.analyzers):
-
-            result, bg = analyzer.fit(num_peaks, baselines[i], peak_prominence)
-            peaks = [v for k, v in result.best_values.items() if "_center" in k]
-            results.append(result)
-            peak_results.append(peaks)
-            bgs.append(bg)
-
-        start_voltages = np.array(self.get_metas("Start Voltage"))
-        delta_ev = np.diff(start_voltages)
-
-        pixel_per_ev = cal_params.get("pixel_per_ev", None)
-        peak_shift = cal_params.get("peak_shift", None)
-
-        if pixel_per_ev is None:
-            # Average over the peaks (the peak splitting should remain the same)
-            peak_diff = np.diff(peak_results, axis=0).mean(axis=1)
-            pixel_per_ev = np.mean(peak_diff / -delta_ev)
-
-        ref_index, ref_value = cal_params.get("ref_index", None), cal_params.get(
-            "ref_value", None
-        )
-
-        if ref_index is None or ref_value is None:
-            # No reference peak adjustment
-            peak_shift = 0
-        else:
-            peak_pos = np.array(list(zip(*peak_results))[ref_index]) / pixel_per_ev
-
-            peak_shift = np.mean(
-                self.incident_voltage - start_voltages - ref_value - peak_pos
-            )
-
-        if plot:
-            fig, axes = plt.subplots(
-                2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True
-            )
-            plt.subplots_adjust(hspace=0, wspace=0)
-            for i, analyzer in enumerate(self.analyzers):
-                analyzer.plot_fit(axes, results[i], bgs[i])
-            plt.show()
-
-        return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}
+    def __init__(self, paths, roi, pixel_per_ev, peak_shift, incident_voltage):
+        assert len(paths) > 0, "Paths cannot be empty"
+        self.analyzers = [
+            XPSAnalyzer(path, roi, pixel_per_ev, peak_shift, incident_voltage)
+            for path in paths
+        ]
+        self.incident_voltage = incident_voltage
+        self.roi = roi
+        super().__init__(self.analyzers)

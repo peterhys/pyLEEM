@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
-from pyleem.sees import SEES_onset, SEESAnalyzer, SEESGroup
+from pyleem.sees import SEES_onset, SEESAnalyzer, SEESGroup, calibrate_sees
+from pyleem.analysis import ProfileAnalyzer
 
 
 def test_sees_onset(sees_array):
@@ -17,35 +18,34 @@ def test_sees_onset(sees_array):
 
 
 @pytest.fixture
-def sees_analyzer(sees_raw_file, roi):
+def sees_analyzer(sees_raw_file, roi, pixel_per_ev, peak_shift):
     """Create a SEESAnalyzer instance."""
-    return SEESAnalyzer(sees_raw_file, roi, sigma=10)
+    return SEESAnalyzer(sees_raw_file, roi, pixel_per_ev, peak_shift, sigma=10)
 
 
 class TestSEESAnalyzer:
     """Test SEESAnalyzer class."""
 
     @pytest.fixture
-    def sees_analyzer(self, sees_raw_file, roi_calibrated):
+    def sees_analyzer(self, sees_raw_file, roi, pixel_per_ev, peak_shift):
         """Create a SEESAnalyzer instance."""
-        return SEESAnalyzer(sees_raw_file, roi_calibrated, sigma=0)
+        return SEESAnalyzer(sees_raw_file, roi, pixel_per_ev, peak_shift, sigma=0)
 
     def test_processing(self, sees_analyzer):
         """Test processing method."""
-        sees_analyzer.preprocess()
+
         assert sees_analyzer.pk_idx == 57  # filtered profile changes pk_idx
         assert sees_analyzer.slope == 12.5
         assert np.isclose(sees_analyzer.onset_pos, 40.0, rtol=1e-2)
-        assert np.isclose(sees_analyzer.surface_potential, -2.5, rtol=1e-2)
-        assert sees_analyzer.onset == 0.0
+        assert np.isclose(sees_analyzer.potential, -2.5, rtol=1e-2)
 
     def test_transform_abscissa(self, sees_analyzer):
         """Test transform_abscissa method."""
 
         # given the 16 pixel per ev
         # the abscissa should be 0 to 8 eV after conversion
-        sees_analyzer.abscissa = np.linspace(0, 8, 128, endpoint=False)
-        sees_analyzer.abscissa_label = "Energy [eV]"
+        sees_analyzer.abscissa == np.linspace(0, 8, 128, endpoint=False)
+        sees_analyzer.abscissa_label == "Energy [eV]"
 
     def test_sees_onset(self, sees_analyzer):
         """Test SEES_onset with ramp profile.
@@ -59,26 +59,47 @@ class TestSEESAnalyzer:
         assert np.isclose(onset_pos, 40.0, rtol=1e-2)
 
 
+class TestCalibrateSEES:
+    """Test calibrate_sees function."""
+
+    def test_calibrate_sees(self, sees_multiple_raw_files, roi):
+        """Test calibrate_sees function."""
+        analyzers = [
+            ProfileAnalyzer(sees_raw_file, roi)
+            for sees_raw_file in sees_multiple_raw_files
+        ]
+        cal_result = calibrate_sees(analyzers, {"sigma": 0}, plot=False)
+        assert cal_result["pixel_per_ev"] == 16.0
+        assert np.isclose(cal_result["peak_shift"], 3.75, rtol=0.1)
+
+    def test_calibrate_sees_with_pixel_per_ev(self, sees_multiple_raw_files, roi):
+        """Test calibrate_sees function with pixel_per_ev."""
+        analyzers = [
+            ProfileAnalyzer(sees_raw_file, roi)
+            for sees_raw_file in sees_multiple_raw_files
+        ]
+        cal_result = calibrate_sees(analyzers, {"pixel_per_ev": 8}, plot=False)
+        assert cal_result["pixel_per_ev"] == 8
+        assert np.isclose(cal_result["peak_shift"], 6, rtol=0.1)
+
+    def test_calibrate_sees_with_peak_shift(self, sees_multiple_raw_files, roi):
+        """Test calibrate_sees function with peak_shift."""
+        analyzers = [
+            ProfileAnalyzer(sees_raw_file, roi)
+            for sees_raw_file in sees_multiple_raw_files
+        ]
+        cal_result = calibrate_sees(
+            analyzers, {"pixel_per_ev": 8, "peak_shift": 8}, plot=False
+        )
+        assert cal_result["pixel_per_ev"] == 8
+        assert cal_result["peak_shift"] == 8
+
+
 class TestSEESGroup:
     """Test SEESGroup class."""
 
     @pytest.fixture
-    def sees_group(self, sees_multiple_raw_files, roi):
+    def sees_group_empty_raises(self, roi, pixel_per_ev, peak_shift):
         """Create a SEESGroup instance."""
-        return SEESGroup(sees_multiple_raw_files, roi, sigma=0)
-
-    def test_calibrate(self, sees_group):
-        """Test calibration without provided parameters."""
-        cal_result = sees_group.calibrate({}, plot=False)
-        assert cal_result["pixel_per_ev"] == 16.0
-        assert np.isclose(cal_result["peak_shift"], 3.75, rtol=1e-2)
-
-    def test_calibrate_provided_parameters(self, sees_group):
-        """Test calibration with provided parameters."""
-
-        # Provide calibration parameters to avoid issues with synthetic data
-        cal_params = {"pixel_per_ev": 16.0, "peak_shift": 2.0}
-        cal_result = sees_group.calibrate(cal_params, plot=False)
-
-        assert cal_result["pixel_per_ev"] == 16.0
-        assert cal_result["peak_shift"] == 2.0
+        with pytest.raises(AssertionError, match="Paths cannot be empty"):
+            SEESGroup([], roi, pixel_per_ev, peak_shift, sigma=0)

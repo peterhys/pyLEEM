@@ -1,6 +1,13 @@
 import numpy as np
 import cv2
-from pyleem.desp import preprocess_image, get_radius, DESPAnalyzer, DESPGroup
+from pyleem.analysis import Analyzer
+from pyleem.desp import (
+    preprocess_image,
+    get_radius,
+    calibrate_desp,
+    DESPAnalyzer,
+    DESPGroup,
+)
 import pytest
 
 
@@ -32,19 +39,33 @@ def test_get_radius_with_noise():
     assert 80 < x < 120 and 80 < y < 120 and 40 < radius < 80
 
 
+class TestCalibrateDESP:
+    """Test calibrate_desp function."""
+
+    def test_calibrate_desp(self, desp_files):
+        """Test calibrate_desp function."""
+        analyzers = [Analyzer(desp_raw_file) for desp_raw_file in desp_files]
+        cal_result = calibrate_desp(analyzers)
+        assert np.isclose(cal_result["potential_func"](30), 205, rtol=0.1)
+        assert np.isclose(cal_result["potential_func"](35), 207.5, rtol=0.1)
+        assert np.isclose(cal_result["potential_func"](40), 210, rtol=0.1)
+        assert np.isclose(cal_result["potential_func"](45), 212.5, rtol=0.1)
+        assert np.isclose(cal_result["potential_func"](50), 215, rtol=0.1)
+
+
 class TestDESPAnalyzer:
     """Test DESPAnalyzer class."""
 
     @pytest.fixture
-    def desp_analyzer(self, desp_raw_file):
-        """Create an 1DESPAnalyzer instance."""
-        return DESPAnalyzer(desp_raw_file)
+    def desp_analyzer(self, desp_raw_file, desp_potential_func):
+        """Create an DESPAnalyzer instance."""
+        return DESPAnalyzer(desp_raw_file, desp_potential_func)
 
     def test_init(self, desp_analyzer):
         """Test analyzer initialization."""
         assert desp_analyzer.x == 64
         assert desp_analyzer.y == 128
-        assert desp_analyzer.radius == 40
+        assert np.isclose(desp_analyzer.radius, 40, rtol=0.1)
 
     def test_processed_image_property(self, desp_analyzer):
         """Test processed_image property."""
@@ -54,26 +75,24 @@ class TestDESPAnalyzer:
         assert desp_analyzer.processed_image.min() == 0
         assert desp_analyzer.processed_image.max() == 255
 
+    def test_potential_func(self, desp_analyzer):
+        """Test potential_func property."""
+        assert desp_analyzer.potential_func(30) == 205
+        assert desp_analyzer.potential_func(35) == 207.5
+        assert desp_analyzer.potential_func(40) == 210
+        assert desp_analyzer.potential_func(45) == 212.5
+        assert desp_analyzer.potential_func(50) == 215
+
+    def test_potential_non_func_raises(self, desp_files):
+        """Test group initialization with non-function potential_func."""
+        with pytest.raises(AssertionError, match="potential_func must be a callable"):
+            DESPGroup(desp_files, potential_func=1)
+
 
 class TestDESPGroup:
     """Test DESPGroup class."""
 
-    @pytest.fixture
-    def desp_group(self, desp_files):
-        """Create an DESPGroup instance."""
-        return DESPGroup(desp_files)
-
-    def test_init(self, desp_group):
-        """Test group initialization."""
-        assert desp_group.get_attrs("radius") == [30, 40, 50]
-
-    def test_calibrate_method(self, desp_group):
-        """Test calibration returns interpolation function."""
-
-        interp_func = desp_group.calibrate()
-        assert interp_func(30) == 200
-        assert interp_func(35) == 200.5
-        assert interp_func(40) == 201
-        assert interp_func(45) == 201.5
-        assert interp_func(50) == 202
-        assert interp_func(55) == 202.5
+    def test_empty_paths_raises(self):
+        """Test group initialization with empty paths."""
+        with pytest.raises(AssertionError, match="Paths cannot be empty"):
+            DESPGroup([], potential_func=lambda x: x)

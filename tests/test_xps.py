@@ -9,9 +9,11 @@ from pyleem.xps import (
     fit_xps,
     XPSAnalyzer,
     XPSGroup,
+    calibrate_xps,
 )
 import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
+from pyleem.analysis import ProfileAnalyzer
 
 
 def test_shirley_background(xps_array):
@@ -158,14 +160,16 @@ class TestXPSAnalyzer:
     """Test XPSAnalyzer."""
 
     @pytest.fixture
-    def xps_analyzer(self, xps_raw_file, roi_calibrated):
+    def xps_analyzer(self, xps_raw_file, roi, pixel_per_ev, peak_shift):
         """Create an XPSAnalyzer instance."""
-        return XPSAnalyzer(xps_raw_file, roi_calibrated, incident_voltage=400)
+        return XPSAnalyzer(
+            xps_raw_file, roi, pixel_per_ev, peak_shift, incident_voltage=400
+        )
 
     def test_init(self, xps_analyzer):
         """Test XPSAnalyzer initialization."""
-        assert xps_analyzer.is_calibrated
-        assert xps_analyzer.incident_voltage == 400
+
+        assert xps_analyzer.metadata["Incident Voltage"] == (400, "eV")
 
     def test_transform_abscissa(self, xps_analyzer):
         """Test transform_abscissa."""
@@ -208,49 +212,74 @@ class TestXPSAnalyzer:
         plt.close(fig)
 
 
-class TestXPSGroup:
-    """Test XPSGroup."""
+class TestXPSCalibration:
 
     @pytest.fixture
-    def xps_group(self, xps_multiple_raw_files, roi):
-        """Create an XPSGroup instance."""
-        return XPSGroup(xps_multiple_raw_files, roi, incident_voltage=400)
+    def xps_analyzers(self, xps_multiple_raw_files, roi):
+        """Create an XPSAnalyzer instance."""
+        return [
+            ProfileAnalyzer(xps_raw_file, roi)
+            for xps_raw_file in xps_multiple_raw_files
+        ]
 
-    def test_calibrate_method(self, xps_group):
-        """Test calibration."""
+    def test_calibrate_xps(self, xps_analyzers):
+        """Test calibrate_xps function."""
 
         cal_params = {
             "baselines": [(197, 100)] * 3,
             "num_peaks": 1,
             "ref_index": 0,
             "ref_value": 285.0,
+            "incident_voltage": 400,
         }
 
-        cal_result = xps_group.calibrate(cal_params, plot=False)
-        assert np.isclose(cal_result["pixel_per_ev"], 16, rtol=0.1)
-        assert np.allclose(cal_result["peak_shift"], -4, rtol=0.1)
+        cal_result = calibrate_xps(xps_analyzers, cal_params, plot=False)
+        assert np.isclose(cal_result["pixel_per_ev"], 16.0, rtol=0.1)
+        assert np.isclose(cal_result["peak_shift"], -4, rtol=0.1)
 
-    def test_calibrate_with_ppev(self, xps_group):
+    def test_calibrate_ppev_without_reference(self, xps_analyzers):
         """Test calibration with pixel_per_ev."""
         cal_params = {
             "baselines": [(197, 100)] * 3,
             "num_peaks": 1,
             "pixel_per_ev": 8,
+            "incident_voltage": 400,
         }
-        cal_result = xps_group.calibrate(cal_params, plot=False)
+        cal_result = calibrate_xps(xps_analyzers, cal_params, plot=False)
         assert np.isclose(cal_result["pixel_per_ev"], 8, rtol=0.1)
         # no reference peak adjustment
         assert np.allclose(cal_result["peak_shift"], 0, rtol=0.1)
 
-    def test_calibrate_with_peak_shift(self, xps_group):
-        """Test calibration with peak shift."""
+    def test_calibrate_ppev_with_reference(self, xps_analyzers):
+        """Test calibration with pixel_per_ev and reference peak."""
         cal_params = {
             "baselines": [(197, 100)] * 3,
             "num_peaks": 1,
             "pixel_per_ev": 16,
             "ref_index": 0,
             "ref_value": 285.0,
+            "incident_voltage": 400,
         }
-        cal_result = xps_group.calibrate(cal_params, plot=False)
+        cal_result = calibrate_xps(xps_analyzers, cal_params, plot=False)
         assert np.allclose(cal_result["peak_shift"], -4, rtol=0.1)
         assert cal_result["pixel_per_ev"] == 16
+
+    def test_calibrate_ppev_with_peak_shift(self, xps_analyzers):
+        """Test calibration with pixel_per_ev and peak shift."""
+        cal_params = {
+            "pixel_per_ev": 16,
+            "peak_shift": 4,
+        }
+        cal_result = calibrate_xps(xps_analyzers, cal_params, plot=False)
+        assert cal_result["peak_shift"] == 4
+        assert cal_result["pixel_per_ev"] == 16
+
+
+class TestXPSGroup:
+    """Test XPSGroup."""
+
+    @pytest.fixture
+    def xps_group_empty_raises(self, roi, pixel_per_ev, peak_shift):
+        """Create an XPSGroup instance."""
+        with pytest.raises(AssertionError, match="Paths cannot be empty"):
+            XPSGroup([], roi, pixel_per_ev, peak_shift, incident_voltage=400)
