@@ -5,12 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1]
-
-### Fixed
-
-- Fixed the radius detection issue where the radius does not have to be an int.
-
 ## [0.2.0]
 
 ### Changed
@@ -20,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analyzer reader class moved to class attribute.
 - Move the calibration output the analyzer group for a cleaner logic. Both domain analyer and
   analyer group requires calibration parameters.
+
+
+## [0.1.1]
+
+### Fixed
+
+- Fixed the radius detection issue where the radius does not have to be an int.
+
 
 ## [0.1.0]
 
