@@ -1,9 +1,8 @@
 # `pyleem.calibrate`
 
-The module provides parsing of TOML configuration files. A configuration file
-points to calibration files and an ROI. The module can either update the
-calibration parameters to the configuration file or read them from the file.
-The calibration files are used for dispersive plane analysis (SEES, XPS, etc.).
+The module provides helpers for reading and writing TOML configuration files that
+store data paths, an ROI file, optional calibration parameters, and a `[result]`
+section with the final `pixel_per_ev` and `peak_shift` values.
 
 ## Config file format
 
@@ -14,17 +13,16 @@ paths = ["data_0eV.dat", "data_100eV.dat", "data_200eV.dat"]
 roi   = "line.roi"
 
 [calibration]
-# For XPS: additional reference peak parameters are required.
+# Passed directly to calibrate_sees / calibrate_xps as cal_params.
+# For XPS: baselines, num_peaks, incident_voltage (and optionally ref_index / ref_value).
 num_peaks  = 1
 baselines  = [[197, 100], [197, 100], [197, 100]]
 ref_index  = 0
 ref_value  = 285.0
-
+incident_voltage = 400
 
 [result]
-# If result section is present, the calibration function can read
-# the calibration parameters. Otherwise, reset=True can update the
-# field.
+# Written by write_config_result; read back by read_config_result.
 pixel_per_ev = 165.8
 peak_shift   = 3.72
 ```
@@ -32,22 +30,18 @@ peak_shift   = 3.72
 ## Example
 
 ```python
-from pyleem.calibrate import calibrate_profile_config
-from pyleem.sees import SEESGroup
+from pyleem.calibrate import read_config, read_config_result, write_config_result
+from pyleem.sees import SEESGroup, calibrate_sees
 
-# Run calibration and save result to the TOML
-# Plot the calibration plots
-roi = calibrate_profile_config("config.toml", SEESGroup, reset=True, plot=True)
+# Read paths, ROI, and calibration parameters from the config
+base_params, cal_params = read_config("config.toml")
+roi   = base_params["roi"]
+paths = base_params["paths"]
 
-# On subsequent runs, reload from the saved [result] section
-roi = calibrate_profile_config("config.toml", SEESGroup, reset=False)
-
-print(roi.is_calibrated)  # True
-print(roi.pixel_per_ev, roi.peak_shift)
+write_config_result("config.toml", {"pixel_per_ev": 16.0, "peak_shift": 0.5})
+result = read_config_result("config.toml")
 ```
 
-The returned `roi` is a calibrated {py:class}`~pyleem.roi.LineROI` ready to be passed to any
-{py:class}`~pyleem.analysis.ProfileAnalyzer` or {py:class}`~pyleem.analysis.AnalyzerGroup` subclass.
 
 ```{eval-rst}
 .. automodule:: pyleem.calibrate

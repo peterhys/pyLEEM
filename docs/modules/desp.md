@@ -2,30 +2,35 @@
 
 Diffuse Elastic Scattering Pattern (DESP) analysis.
 
-DESP analysis tracks the radius of the
-circular diffraction ring in a series of LEEM micrographs.  A change in radius
-corresponds to the shift of the electron energy collected.
+DESP analysis tracks the radius of the circular diffraction ring in a series of
+LEEM micrographs.  A change in radius corresponds to a shift in the collected
+electron energy.
 
 {py:class}`~pyleem.desp.DESPAnalyzer` detects the circle using OpenCV (bilateral
-filter, Otsu threshold, minimum enclosing circle).
-{py:class}`~pyleem.desp.DESPGroup` calibrates
-an interpolation function based on radius measurements on a standard sample (Au).
+filter, Otsu threshold, minimum enclosing circle). Pass a `potential_func`
+interpolation function to compute the surface potential on
+construction.
+
+{py:class}`~pyleem.desp.DESPGroup` processes a batch of files with a shared
+`potential_func`. {py:func}`~pyleem.desp.calibrate_desp` builds the radius to potential
+interpolation function from standard-sample measurements and returns it in a dict
+under the key `"potential_func"`.
 
 ## Example
 
 ```python
-from pyleem.desp import DESPAnalyzer, DESPGroup
+from pyleem.analysis import Analyzer
+from pyleem.desp import DESPAnalyzer, DESPGroup, calibrate_desp
 import glob
 import matplotlib.pyplot as plt
 
-
-Au_paths  = sorted(glob.glob("Au/*.dat"))
-Au_group  = DESPGroup(Au_paths)
-interp_func  = Au_group.calibrate()   # radius to electron energy
-
+# DESP calibration
+Au_paths = sorted(glob.glob("Au/*.dat"))
+cal_result = calibrate_desp([Analyzer(path) for path in Au_paths])
+potential_func = cal_result["potential_func"]
 
 # DESPAnalyzer
-analyzer = DESPAnalyzer("data.dat", interp_func=interp_func)
+analyzer = DESPAnalyzer("data.dat", potential_func)
 print(f"Potential: {analyzer.potential:.2f} eV")
 fig, ax = plt.subplots()
 analyzer.plot_radius(ax)
@@ -33,13 +38,11 @@ plt.show()
 
 # DESPGroup
 paths = sorted(glob.glob("sample/*.dat"))
-group = DESPGroup(paths, interp_func=interp_func)
+group = DESPGroup(paths, potential_func)
 
 fig, ax = plt.subplots()
 group.plot_potential(ax)
 plt.show()
-
-
 ```
 
 ```{eval-rst}

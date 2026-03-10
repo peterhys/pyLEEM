@@ -4,17 +4,16 @@ The workflow of pyLEEM analysis consists of two parts: calibration and analysis.
 
 ## Calibration
 
-For profile analysis (SEES, XPS, etc.), the pixel per eV and peak shift values
-need to be calibrated, and typically done by shifting the spectrum under different start
-voltages. The calibration process can be done by using the `calibrate` module (see
-the `calibrate` module for more details). The process
-can be streamlined by creating a configuration file to specify the data files
-and region of interest (ROI) files. Subsequent runs can directly extract the
-calibration results from the configuration file.
+For domain specific profile analyzers (SEES, XPS, etc.), `pixel_per_ev` and `peak_shift` must be
+determined before creating any analyzer. For domain specific image analyzers, 
+`potential_func` must be determined before creating any analyzer.
+ Calibration is performed by the module-level functions
+`calibrate_sees`, `calibrate_xps`, or `calibrate_desp`, which accept a list of
+analyzer objects and an optional `cal_params` dict.
 
-To start first create the roi file from ImageJ. (Manual ROI creation is also supported
-through the `roi` module.) The configuration file is a TOML file that points to
-the data files, roi file and the calibration parameters.
+The process can be streamlined with a TOML configuration file (see the
+`calibrate` module).  First create the ROI from ImageJ (or manually via the
+`roi` module), then write a config that points to the calibration files:
 
 ```toml
 # config.toml
@@ -29,24 +28,35 @@ pixel_per_ev = 166.0
 peak_shift   = 3.75
 ```
 
-For example, to calibrate the SEES data, and obtain the calibrated roi:
+For example, to calibrate the SEES data:
 
 ```python
-from pyleem.calibrate import calibrate_profile_config
-from pyleem.sees import SEESGroup
+from pyleem.calibrate import read_config, read_config_result, write_config_result
+from pyleem.analysis import ProfileAnalyzer
+from pyleem.sees import calibrate_sees
 
-roi = calibrate_profile_config("config.toml", SEESGroup, reset=True, plot=True)
+# Read paths and ROI from the config
+base_params, cal_params = read_config("config.toml")
+roi   = base_params["roi"]
+paths = base_params["paths"]
+
+cal_result = calibrate_sees([ProfileAnalyzer(path, roi) for path in paths], cal_params)
+write_config_result("config.toml", cal_result)
+pixel_per_ev = cal_result["pixel_per_ev"]
+peak_shift   = cal_result["peak_shift"]
 ```
 
-To only extract the calibration results without re-fitting, run:
+On subsequent runs, skip re-fitting and reload the saved result:
 
 ```python
-roi = calibrate_profile_config("config.toml", SEESGroup, reset=False)
+result = read_config_result("config.toml")
+pixel_per_ev = result["pixel_per_ev"]
+peak_shift   = result["peak_shift"]
 ```
 
 ## Analysis
 
-The domain specific `Analyzer` and `AnalyzerGroup` classes are used to perform the analysis.
+The domain-specific analyzer and analyzer group classes are used to perform the analysis.
 
 ### Single-file analysis
 
@@ -54,8 +64,8 @@ The domain specific `Analyzer` and `AnalyzerGroup` classes are used to perform t
 from pyleem.sees import SEESAnalyzer
 import matplotlib.pyplot as plt
 
-analyzer = SEESAnalyzer("data_0eV.dat", roi, sigma=10)
-print(analyzer.surface_potential)  # eV
+analyzer = SEESAnalyzer("data_0eV.dat", roi, pixel_per_ev, peak_shift, sigma=10)
+print(analyzer.potential)  # eV
 
 fig, ax = plt.subplots()
 analyzer.plot(ax, show_fit=True)
@@ -69,8 +79,8 @@ from pyleem.sees import SEESGroup
 import glob
 
 paths = sorted(glob.glob("sample/*.dat"))
-group = SEESGroup(paths, roi, sigma=10)
+group = SEESGroup(paths, roi, pixel_per_ev, peak_shift, sigma=10)
 
-potentials = group.get_attrs("surface_potential")
+potentials = group.get_attrs("potential")
 time_intervals = group.get_time_intervals()
 ```
