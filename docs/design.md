@@ -7,6 +7,8 @@ It provides tools for reading LEEM metadata and raw data, and for calibrating an
 analyzing X-ray Photoelectron Spectroscopy (XPS), Secondary Electron Energy Spectroscopy (SEES),
 and Diffuse Elastic Scattering Pattern (DESP).
 
+Additional tools include stitching that can create a continuous spectrum from overlapping spectra.
+
 The package is designed to be modular and extendable.
 
 ## Reader class
@@ -35,9 +37,9 @@ available subclasses are:
 - `SEESAnalyzer`: Secondary Electron Energy Spectroscopy (SEES) analyzer.
 - `DESPAnalyzer`: Diffuse Elastic Scattering Pattern (DESP) analyzer.
 - `XPSAnalyzer`: X-ray Photoelectron Spectroscopy (XPS) analyzer.
+- `StitchAnalyzer`: Combines multiple overlapping spectra into a single continuous spectrum.
 
-These subclasses provide domain-specific analysis tools for the raw data. For example,
-the `SEESAnalyzer` class is used to perform SEES analysis on the raw data.
+These subclasses provide domain-specific analysis tools for the raw data.
 
 ## AnalyzerGroup class
 

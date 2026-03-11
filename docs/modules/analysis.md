@@ -7,7 +7,7 @@ This module contains the base classes used across all domain-specific analyzers:
 - {py:class}`~pyleem.analyzer.Analyzer` — wraps a single `.dat` file and exposes its image and metadata.
 - {py:class}`~pyleem.analyzer.ProfileAnalyzer` — extends `Analyzer` with line-profile extraction.
   Subclasses set `_abscissa`, `_abscissa_label`, `_ordinate`, `_ordinate_label` directly in `__init__`
-  to define their axis representation. The attributes are property acessed by `abscissa`, `abscissa_label`,
+  to define their axis representation. The attributes are property accessed by `abscissa`, `abscissa_label`,
   `ordinate`, and `ordinate_label`.
 - {py:class}`~pyleem.analyzer.AnalyzerGroup` — manages a list of analyzer instances for batch and
   time-series workflows.

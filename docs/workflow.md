@@ -30,13 +30,13 @@ sigma = 10
 [calibration.result]
 # written by config.calibrate(update=True)
 pixel_per_ev = 16.0
-peak_shift   = 0.5
+peak_shift = 0.5
 ```
 
 For example, to calibrate the SEES data:
 
 ```python
-from pyleem.sees import SEESConfig
+from pyleem.analysis.sees import SEESConfig
 
 config = SEESConfig("config.toml")
 
@@ -57,6 +57,9 @@ pixel_per_ev = cal_result["pixel_per_ev"]
 peak_shift = cal_result["peak_shift"]
 ```
 
+The calibration can also be done manually, see domain specific analysis
+module for detailed implementation.
+
 ## Analysis
 
 The domain-specific analyzer and analyzer group classes are used to perform the analysis.
@@ -64,7 +67,7 @@ The domain-specific analyzer and analyzer group classes are used to perform the 
 ### Single-file analysis
 
 ```python
-from pyleem.sees import SEESAnalyzer
+from pyleem.analysis.sees import SEESAnalyzer
 import matplotlib.pyplot as plt
 
 analyzer = SEESAnalyzer("data_0eV.dat", roi, pixel_per_ev, peak_shift, sigma=10)
@@ -78,7 +81,7 @@ plt.show()
 ### Batch and time-series analysis
 
 ```python
-from pyleem.sees import SEESGroup
+from pyleem.analysis.sees import SEESGroup
 import glob
 
 paths = sorted(glob.glob("sample/*.dat"))

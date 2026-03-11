@@ -6,9 +6,9 @@
 :maxdepth: 2
 :caption: Contents
 
-modules/index
-design
 workflow
+design
+modules/index
 CONTRIBUTING
 CHANGELOG
 LICENSE
