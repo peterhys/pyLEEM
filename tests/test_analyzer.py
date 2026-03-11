@@ -1,5 +1,5 @@
 import pytest
-from pyleem.analysis import Analyzer, AnalyzerGroup, ProfileAnalyzer
+from pyleem.analyzer import Analyzer, AnalyzerGroup, ProfileAnalyzer
 import matplotlib.pyplot as plt
 
 

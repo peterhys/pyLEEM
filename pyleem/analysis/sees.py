@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from pyleem.analysis import ProfileAnalyzer, AnalyzerGroup
+from pyleem.analyzer import ProfileAnalyzer, AnalyzerGroup
 from pyleem.config import Config
 
 

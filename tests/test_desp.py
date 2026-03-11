@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
-from pyleem.analysis import Analyzer
-from pyleem.desp import (
+from pyleem.analyzer import Analyzer
+from pyleem.analysis.desp import (
     preprocess_image,
     get_radius,
     calibrate_desp,

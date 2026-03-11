@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import scipy.stats
-from pyleem.xps import (
+from pyleem.analysis.xps import (
     shirley_background,
     pseudo_voigt_fits,
     parameter_estimation,
@@ -14,7 +14,7 @@ from pyleem.xps import (
 )
 import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
-from pyleem.analysis import ProfileAnalyzer
+from pyleem.analyzer import ProfileAnalyzer
 
 
 def test_shirley_background(xps_array):

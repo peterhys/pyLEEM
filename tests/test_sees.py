@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
-from pyleem.sees import SEES_onset, SEESAnalyzer, SEESGroup, SEESConfig, calibrate_sees
-from pyleem.analysis import ProfileAnalyzer
+from pyleem.analysis.sees import SEES_onset, SEESAnalyzer, SEESGroup, SEESConfig, calibrate_sees
+from pyleem.analyzer import ProfileAnalyzer
 
 
 def test_sees_onset(sees_array):

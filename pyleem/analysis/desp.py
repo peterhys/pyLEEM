@@ -1,4 +1,4 @@
-from pyleem.analysis import Analyzer, AnalyzerGroup
+from pyleem.analyzer import Analyzer, AnalyzerGroup
 import cv2
 import numpy as np
 from scipy.interpolate import interp1d
@@ -90,9 +90,11 @@ def calibrate_desp(analyzers):
 class DESPConfig(Config):
     """Config for DESP analyzer.
 
-    [calibration]
-    # a directory containing the files
-    path_pattern = "Au_sample/*.dat"
+    .. code-block:: toml
+
+        [calibration]
+        # a directory containing the files
+        path_pattern = "Au_sample/*.dat"
     """
 
     def calibrate_results(self, cal_section):

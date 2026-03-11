@@ -36,14 +36,10 @@ class Analyzer:
         """Enable sorting by file path."""
         return self.path < other.path
 
-    def read_image(self):
-        """Read the image from the reader."""
-        return self.reader.read_image()
-
     @property
     def image(self):
         """Return the image data from the reader."""
-        return self.read_image()
+        return self.reader.read_image()
 
     def plot_image(self, ax=None):
         """Plot the raw image data.
@@ -78,7 +74,7 @@ class ProfileAnalyzer(Analyzer):
         super().__init__(path)
 
         self.roi = roi
-        self._profile = self.read_profile()
+        self._profile = self.roi.read_profile(self.image)
         self.pixel = np.arange(len(self.profile))
         self._abscissa, self._abscissa_label = self.pixel, "Pixel"
         self._ordinate, self._ordinate_label = self.profile, "Intensity"
@@ -102,10 +98,6 @@ class ProfileAnalyzer(Analyzer):
     def ordinate_label(self):
         """Return the ordinate label."""
         return self._ordinate_label
-
-    def read_profile(self):
-        """Read the profile from the image."""
-        return self.roi.read_profile(self.image)
 
     @property
     def profile(self):
