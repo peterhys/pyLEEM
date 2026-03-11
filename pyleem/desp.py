@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+from pyleem.config import Config
 
 
 def preprocess_image(image, gamma=0.5, blur_kernel=5, morph_kernel_size=3):
@@ -56,15 +57,17 @@ def get_radius(image):
     return x, y, radius
 
 
-def calibrate_desp(analyzers, cal_params=None, plot=False):
-    """Create radius-to-voltage calibration function.
+def calibrate_desp(analyzers):
+    """Calibrate radius to potential using multiple images.
 
     Uses linear interpolation to map pattern radii to electron energies.
 
-    :return: Interpolation function mapping radius to voltage (voltage_map).
+    :param list analyzers: List of Analyzer objects.
+    :param dict cal_params: Dictionary with 'paths' and 'parameters'.
+    :return: Interpolation function mapping radius to potential (potential_func).
     :rtype: dict
     """
-    cal_params = cal_params or {}
+
     radii = []
     start_voltages = []
     for analyzer in analyzers:
@@ -80,7 +83,25 @@ def calibrate_desp(analyzers, cal_params=None, plot=False):
         bounds_error=False,
         fill_value="extrapolate",
     )
+
     return {"potential_func": interp_func}
+
+
+class DESPConfig(Config):
+    """Config for DESP analyzer.
+
+    [calibration]
+    # a directory containing the files
+    path_pattern = "Au_sample/*.dat"
+    """
+
+    def calibrate_results(self, cal_section):
+        """Calibrate radius to potential using multiple images."""
+        paths = sorted(self.get_patterned_paths(cal_section["path_pattern"]))
+        # assert len(paths) > 0, "No files found in the directory"
+        analyzers = [Analyzer(path) for path in paths]
+
+        return calibrate_desp(analyzers)
 
 
 class DESPAnalyzer(Analyzer):

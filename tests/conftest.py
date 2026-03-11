@@ -251,6 +251,15 @@ def roi():
 
 
 @pytest.fixture
+def roi_file(tmp_path, roi):
+    """Save the conftest roi fixture to a temporary ImageJ ROI file."""
+
+    roi_path = tmp_path / "test.roi"
+    roi.to_roi_object().tofile(roi_path)
+    return roi_path
+
+
+@pytest.fixture
 def pixel_per_ev():
     """Create a pixel per eV function."""
     return 16

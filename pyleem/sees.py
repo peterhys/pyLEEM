@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from pyleem.analysis import ProfileAnalyzer, AnalyzerGroup
+from pyleem.config import Config
 
 
 def SEES_onset(profile):
@@ -18,6 +19,40 @@ def SEES_onset(profile):
     pk_idx = np.argmax(profile_derivative)
     onset_pos = pk_idx - profile[pk_idx] / slope
     return pk_idx, slope, onset_pos
+
+
+def calibrate_sees(analyzers, cal_params):
+    """Calibrate energy scale using onset positions."""
+    sigma = cal_params.get("sigma", 10)
+    onset_pos = []
+    start_voltages = []
+    for analyzer in analyzers:
+        onset_pos.append(SEES_onset(analyzer.process_profile(sigma))[2])
+        start_voltages.append(analyzer.metadata["Start Voltage"][0])
+
+    onset_pos = np.array(onset_pos)
+
+    pixel_per_ev = cal_params.get("pixel_per_ev", None) or np.mean(
+        np.diff(onset_pos) / -np.diff(start_voltages)
+    )
+    peak_shift = cal_params.get("peak_shift", None) or np.mean(
+        start_voltages + onset_pos / pixel_per_ev
+    )
+
+    return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}
+
+
+class SEESConfig(Config):
+    """Config for SEES analyzer."""
+
+    def calibrate_results(self, cal_section):
+        """Calibrate energy scale using onset positions."""
+        roi = self.get_roi()
+        paths = self.get_paths(cal_section["paths"])
+        analyzers = [ProfileAnalyzer(path, roi) for path in paths]
+        cal_params = cal_section.get("parameters", {})
+
+        return calibrate_sees(analyzers, cal_params)
 
 
 class SEESAnalyzer(ProfileAnalyzer):
@@ -69,44 +104,6 @@ class SEESAnalyzer(ProfileAnalyzer):
             )
         ax.set_xlabel(self.abscissa_label)
         ax.set_ylabel(self.ordinate_label)
-
-
-def calibrate_sees(analyzers, cal_params=None, plot=False):
-    """Calibrate energy scale using onset positions.
-
-    :param dict cal_params: Calibration parameters.
-    :param bool plot: Whether to display calibration plots.
-    :return: Calibration results (pixel_per_ev, peak_shift).
-    :rtype: dict
-    """
-    cal_params = cal_params or {}
-    sigma = cal_params.get("sigma", 10)
-
-    onset_pos = []
-    start_voltages = []
-    for analyzer in analyzers:
-        onset_pos.append(SEES_onset(analyzer.process_profile(sigma))[2])
-        start_voltages.append(analyzer.metadata["Start Voltage"][0])
-    
-    onset_pos = np.array(onset_pos)
-
-    if cal_params.get("pixel_per_ev", None) is None:
-        pixel_per_ev = np.mean(np.diff(onset_pos) / -np.diff(start_voltages))
-    else:
-        pixel_per_ev = cal_params["pixel_per_ev"]
-
-    if cal_params.get("peak_shift", None) is None:
-        peak_shift = np.mean(start_voltages + onset_pos / pixel_per_ev)
-    else:
-        peak_shift = cal_params["peak_shift"]
-
-    if plot:
-        _, ax = plt.subplots(1, 1, figsize=(8, 4.5))
-        for analyzer in analyzers:
-            analyzer.plot(ax, show_fit=True)
-        plt.show()
-
-    return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}
 
 
 class SEESGroup(AnalyzerGroup):

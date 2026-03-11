@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from pyleem.sees import SEES_onset, SEESAnalyzer, SEESGroup, calibrate_sees
+from pyleem.sees import SEES_onset, SEESAnalyzer, SEESGroup, SEESConfig, calibrate_sees
 from pyleem.analysis import ProfileAnalyzer
 
 
@@ -68,7 +68,7 @@ class TestCalibrateSEES:
             ProfileAnalyzer(sees_raw_file, roi)
             for sees_raw_file in sees_multiple_raw_files
         ]
-        cal_result = calibrate_sees(analyzers, {"sigma": 0}, plot=False)
+        cal_result = calibrate_sees(analyzers, {"sigma": 0})
         assert cal_result["pixel_per_ev"] == 16.0
         assert np.isclose(cal_result["peak_shift"], 3.75, rtol=0.1)
 
@@ -78,7 +78,7 @@ class TestCalibrateSEES:
             ProfileAnalyzer(sees_raw_file, roi)
             for sees_raw_file in sees_multiple_raw_files
         ]
-        cal_result = calibrate_sees(analyzers, {"pixel_per_ev": 8}, plot=False)
+        cal_result = calibrate_sees(analyzers, {"pixel_per_ev": 8})
         assert cal_result["pixel_per_ev"] == 8
         assert np.isclose(cal_result["peak_shift"], 6, rtol=0.1)
 
@@ -88,9 +88,7 @@ class TestCalibrateSEES:
             ProfileAnalyzer(sees_raw_file, roi)
             for sees_raw_file in sees_multiple_raw_files
         ]
-        cal_result = calibrate_sees(
-            analyzers, {"pixel_per_ev": 8, "peak_shift": 8}, plot=False
-        )
+        cal_result = calibrate_sees(analyzers, {"pixel_per_ev": 8, "peak_shift": 8})
         assert cal_result["pixel_per_ev"] == 8
         assert cal_result["peak_shift"] == 8
 
@@ -103,3 +101,49 @@ class TestSEESGroup:
         """Create a SEESGroup instance."""
         with pytest.raises(AssertionError, match="Paths cannot be empty"):
             SEESGroup([], roi, pixel_per_ev, peak_shift, sigma=0)
+
+
+class TestSEESConfig:
+    """Test SEESConfig class."""
+
+    @pytest.fixture
+    def sees_config_file(self, tmp_path, roi_file, sees_multiple_raw_files):
+        """Write a SEES TOML config file with ROI, calibration paths and result.
+
+        The roi file parameter is not used but necessary for maintaining
+        the same tmp_path.
+        """
+
+        path_list = ", ".join(f'"{f.name}"' for f in sees_multiple_raw_files)
+        content = (
+            f'[base]\nroi = "test.roi"\n'
+            f"[calibration]\npaths = [{path_list}]\n"
+            "[calibration.parameters]\nsigma = 0\n"
+            "[calibration.result]\npixel_per_ev = 8.0\npeak_shift = 0.0\n"
+        )
+        config_path = tmp_path / "sees_config.toml"
+        config_path.write_text(content)
+        return config_path
+
+    def test_calibrate(self, sees_config_file):
+        """Test SEESConfig.calibrate with reset=True runs SEES calibration."""
+
+        result = SEESConfig(sees_config_file).calibrate()
+        assert np.isclose(result["pixel_per_ev"], 16.0, rtol=0.1)
+        assert np.isclose(result["peak_shift"], 3.75, rtol=0.1)
+
+        persisted = SEESConfig(sees_config_file).read_section("calibration.result")
+        assert persisted["pixel_per_ev"] == 8.0
+        assert persisted["peak_shift"] == 0.0
+
+    def test_calibrate_update(self, sees_config_file):
+        """Test SEESConfig.calibrate with update=True persists the result."""
+
+        config = SEESConfig(sees_config_file)
+        result = config.calibrate(update=True)
+        assert np.isclose(result["pixel_per_ev"], 16.0, rtol=0.1)
+        assert np.isclose(result["peak_shift"], 3.75, rtol=0.1)
+
+        persisted = config.read_section("calibration.result")
+        assert np.isclose(persisted["pixel_per_ev"], 16.0, rtol=0.1)
+        assert np.isclose(persisted["peak_shift"], 3.75, rtol=0.1)

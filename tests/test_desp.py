@@ -6,6 +6,7 @@ from pyleem.desp import (
     get_radius,
     calibrate_desp,
     DESPAnalyzer,
+    DESPConfig,
     DESPGroup,
 )
 import pytest
@@ -96,3 +97,21 @@ class TestDESPGroup:
         """Test group initialization with empty paths."""
         with pytest.raises(AssertionError, match="Paths cannot be empty"):
             DESPGroup([], potential_func=lambda x: x)
+
+
+def test_calibrate_reset(tmp_path, desp_files):
+    """Test that the calibrated potential_func interpolates correctly.
+
+    The desp_files parameter is not used but necessary for maintaining
+    the same tmp_path. When the path is searched, the files can be found.
+    """
+
+    content = f'[calibration]\npath_pattern = "*.dat"\n'
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(content)
+
+    result = DESPConfig(config_path).calibrate()
+    func = result["potential_func"]
+    assert callable(func)
+    assert np.isclose(func(20), 200, rtol=0.1)
+    assert np.isclose(func(60), 220, rtol=0.1)

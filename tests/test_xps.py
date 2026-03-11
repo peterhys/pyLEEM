@@ -8,6 +8,7 @@ from pyleem.xps import (
     parameter_contraint,
     fit_xps,
     XPSAnalyzer,
+    XPSConfig,
     XPSGroup,
     calibrate_xps,
 )
@@ -233,7 +234,7 @@ class TestXPSCalibration:
             "incident_voltage": 400,
         }
 
-        cal_result = calibrate_xps(xps_analyzers, cal_params, plot=False)
+        cal_result = calibrate_xps(xps_analyzers, cal_params)
         assert np.isclose(cal_result["pixel_per_ev"], 16.0, rtol=0.1)
         assert np.isclose(cal_result["peak_shift"], -4, rtol=0.1)
 
@@ -245,7 +246,7 @@ class TestXPSCalibration:
             "pixel_per_ev": 8,
             "incident_voltage": 400,
         }
-        cal_result = calibrate_xps(xps_analyzers, cal_params, plot=False)
+        cal_result = calibrate_xps(xps_analyzers, cal_params)
         assert np.isclose(cal_result["pixel_per_ev"], 8, rtol=0.1)
         # no reference peak adjustment
         assert np.allclose(cal_result["peak_shift"], 0, rtol=0.1)
@@ -260,18 +261,8 @@ class TestXPSCalibration:
             "ref_value": 285.0,
             "incident_voltage": 400,
         }
-        cal_result = calibrate_xps(xps_analyzers, cal_params, plot=False)
+        cal_result = calibrate_xps(xps_analyzers, cal_params)
         assert np.allclose(cal_result["peak_shift"], -4, rtol=0.1)
-        assert cal_result["pixel_per_ev"] == 16
-
-    def test_calibrate_ppev_with_peak_shift(self, xps_analyzers):
-        """Test calibration with pixel_per_ev and peak shift."""
-        cal_params = {
-            "pixel_per_ev": 16,
-            "peak_shift": 4,
-        }
-        cal_result = calibrate_xps(xps_analyzers, cal_params, plot=False)
-        assert cal_result["peak_shift"] == 4
         assert cal_result["pixel_per_ev"] == 16
 
 
@@ -283,3 +274,56 @@ class TestXPSGroup:
         """Create an XPSGroup instance."""
         with pytest.raises(AssertionError, match="Paths cannot be empty"):
             XPSGroup([], roi, pixel_per_ev, peak_shift, incident_voltage=400)
+
+
+class TestXPSConfig:
+    """Test XPSConfig class."""
+
+    @pytest.fixture
+    def xps_config_file(self, tmp_path, roi, xps_multiple_raw_files):
+        """Write an XPS TOML config file with ROI, calibration paths and result.
+
+        Here we force the default result to 8.0 pixel_per_ev and 0.0 peak_shift.
+        The calculated result is 16.0 pixel_per_ev and -4.0 peak_shift.
+        """
+        roi_path = tmp_path / "test.roi"
+        roi.to_roi_object().tofile(roi_path)
+
+        path_list = ", ".join(f'"{f.name}"' for f in xps_multiple_raw_files)
+        content = (
+            f'[base]\nroi = "test.roi"\n'
+            f"[calibration]\npaths = [{path_list}]\n"
+            "[calibration.parameters]\n"
+            "num_peaks = 1\n"
+            "baselines = [[197, 100], [197, 100], [197, 100]]\n"
+            "incident_voltage = 400\n"
+            "ref_index = 0\n"
+            "ref_value = 285.0\n"
+            "[calibration.result]\npixel_per_ev = 8.0\npeak_shift = 0.0\n"
+        )
+        config_path = tmp_path / "xps_config.toml"
+        config_path.write_text(content)
+        return config_path
+
+    def test_calibrate(self, xps_config_file):
+        """Test XPSConfig.calibrate with reset=True runs XPS calibration."""
+
+        result = XPSConfig(xps_config_file).calibrate()
+        assert np.isclose(result["pixel_per_ev"], 16.0, rtol=0.1)
+        assert np.isclose(result["peak_shift"], -4.0, rtol=0.1)
+
+        persisted = XPSConfig(xps_config_file).read_section("calibration.result")
+        assert persisted["pixel_per_ev"] == 8.0
+        assert persisted["peak_shift"] == 0.0
+
+    def test_calibrate_update(self, xps_config_file):
+        """Test XPSConfig.calibrate with update=True persists the result."""
+
+        config = XPSConfig(xps_config_file)
+        result = config.calibrate(update=True)
+        assert np.isclose(result["pixel_per_ev"], 16.0, rtol=0.1)
+        assert np.isclose(result["peak_shift"], -4.0, rtol=0.1)
+
+        persisted = config.read_section("calibration.result")
+        assert np.isclose(persisted["pixel_per_ev"], 16.0, rtol=0.1)
+        assert np.isclose(persisted["peak_shift"], -4.0, rtol=0.1)
