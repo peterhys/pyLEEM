@@ -12,20 +12,25 @@ fitting peaks in pixel space across scans acquired at known start voltages. Pass
 `incident_voltage` and optionally `ref_index` / `ref_value` in `cal_params` to
 anchor the energy scale to a known reference peak.
 
+{py:class}`~pyleem.xps.XPSConfig` drives calibration from a TOML config file
+(see the `config` module).
+
 ## Example
 
 ```python
-from pyleem.xps import XPSAnalyzer, XPSGroup, calibrate_xps
+from pyleem.xps import XPSAnalyzer, XPSConfig, XPSGroup, calibrate_xps
 from pyleem.analysis import ProfileAnalyzer
 from pyleem.roi import LineROI
 import glob
 import matplotlib.pyplot as plt
 
 # XPS calibration
+
 # from config file
-base_params, cal_params = read_config("config.toml")
-roi = base_params["roi"]
-paths = base_params["paths"]
+config = XPSConfig("xps_config.toml")
+cal_result = config.calibrate(reset=True, update=True)
+pixel_per_ev = cal_result["pixel_per_ev"]
+peak_shift = cal_result["peak_shift"]
 
 # manually set the paths
 roi = LineROI(src=(256, 10), dst=(256, 500), linewidth=20)
@@ -34,7 +39,7 @@ cal_params = {
     "baselines": [(200, 80), (200, 80), (200, 80)],
     "num_peaks": 1,
     "ref_index": 0,
-    "ref_value": 84.0,   # Au 4f7/2 reference in eV
+    "ref_value": 84.0,  # Au 4f7/2 reference in eV
     "incident_voltage": 400,
 }
 cal_result = calibrate_xps([ProfileAnalyzer(path, roi) for path in paths], cal_params)

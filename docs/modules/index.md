@@ -7,7 +7,7 @@ Reference documentation for the `pyleem` package and its analysis modules.
 
 reader
 roi
-calibrate
+config
 metadata
 metainfo
 utils

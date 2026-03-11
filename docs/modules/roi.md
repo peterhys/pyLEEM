@@ -17,12 +17,11 @@ roi = LineROI("line.roi")
 # Specify manually (coordinates in (row, col) / (y, x) order)
 roi = LineROI(src=(256, 10), dst=(256, 500), linewidth=20)
 
-# Export back to ImageJ
-roi.to_roifile("line.roi")
+# Read profile from image
+profile = roi.read_profile(image)
 
-# Convert to a dict for skimage.measure.profile_line
-print(roi.to_dict())
-# {'src': (256, 10), 'dst': (256, 500), 'linewidth': 20, ...}
+# Export back to ImageJ file
+roi.to_roi_object().tofile("line.roi")
 ```
 
 ```{eval-rst}

@@ -23,8 +23,7 @@ image = reader.read_image()  # ndarray, shape (height, width), uint16
 from pyleem.roi import LineROI
 
 roi = LineROI(src=(256, 0), dst=(256, 511), linewidth=10)
-profile = reader.read_profile(roi)  # 1D ndarray
-
+profile = roi.read_profile(image)  # 1D ndarray
 ```
 
 ## Subclassing `Reader`
@@ -50,11 +49,6 @@ class MyReader(Reader):
     def read_image(self):
         # Return a 2D ndarray (height, width).
         return np.zeros((512, 512), dtype=np.uint16)
-
-    def read_profile(self, roi):
-        import skimage
-
-        return skimage.measure.profile_line(self.read_image(), **roi.to_dict())
 
     def __lt__(self, other):
         return self.path < other.path

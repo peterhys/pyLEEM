@@ -5,53 +5,56 @@ The workflow of pyLEEM analysis consists of two parts: calibration and analysis.
 ## Calibration
 
 For domain specific profile analyzers (SEES, XPS, etc.), `pixel_per_ev` and `peak_shift` must be
-determined before creating any analyzer. For domain specific image analyzers, 
+determined before creating any analyzer. For domain specific image analyzers,
 `potential_func` must be determined before creating any analyzer.
- Calibration is performed by the module-level functions
+Calibration is performed by the module-level functions
 `calibrate_sees`, `calibrate_xps`, or `calibrate_desp`, which accept a list of
 analyzer objects and an optional `cal_params` dict.
 
 The process can be streamlined with a TOML configuration file (see the
-`calibrate` module).  First create the ROI from ImageJ (or manually via the
+`config` module). First create the ROI from ImageJ (or manually via the
 `roi` module), then write a config that points to the calibration files:
 
 ```toml
 # config.toml
 [base]
-paths = ["data_0eV.dat", "data_100eV.dat", "data_200eV.dat"]
-roi   = "line.roi"
+roi = "line.roi"
 
-# calibration parameters are optional and
-# will be computed automatically if omitted
 [calibration]
-pixel_per_ev = 166.0
-peak_shift   = 3.75
+paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
+
+# calibration parameters are domain-specific and optional
+[calibration.parameters]
+sigma = 10
+
+[calibration.result]
+# written by config.calibrate(update=True)
+pixel_per_ev = 16.0
+peak_shift   = 0.5
 ```
 
 For example, to calibrate the SEES data:
 
 ```python
-from pyleem.calibrate import read_config, read_config_result, write_config_result
-from pyleem.analysis import ProfileAnalyzer
-from pyleem.sees import calibrate_sees
+from pyleem.sees import SEESConfig
 
-# Read paths and ROI from the config
-base_params, cal_params = read_config("config.toml")
-roi   = base_params["roi"]
-paths = base_params["paths"]
+config = SEESConfig("config.toml")
 
-cal_result = calibrate_sees([ProfileAnalyzer(path, roi) for path in paths], cal_params)
-write_config_result("config.toml", cal_result)
+# Run calibration and persist the result to [calibration.result]
+cal_result = config.calibrate(update=True)
 pixel_per_ev = cal_result["pixel_per_ev"]
-peak_shift   = cal_result["peak_shift"]
+peak_shift = cal_result["peak_shift"]
 ```
 
-On subsequent runs, skip re-fitting and reload the saved result:
+On subsequent runs, skip re-fitting and 
+directly read from the [calibration.result] section.
 
 ```python
-result = read_config_result("config.toml")
-pixel_per_ev = result["pixel_per_ev"]
-peak_shift   = result["peak_shift"]
+# read from [calibration.result] section
+cal_result = config.read_section("calibration.result")
+
+pixel_per_ev = cal_result["pixel_per_ev"]
+peak_shift = cal_result["peak_shift"]
 ```
 
 ## Analysis

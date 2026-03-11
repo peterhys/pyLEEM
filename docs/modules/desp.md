@@ -16,15 +16,26 @@ construction.
 interpolation function from standard-sample measurements and returns it in a dict
 under the key `"potential_func"`.
 
+{py:class}`~pyleem.desp.DESPConfig` drives calibration from a TOML config file
+(see the `config` module). The config file uses `path_pattern` (a glob pattern)
+under `[calibration]` instead of an explicit paths list.
+
 ## Example
 
 ```python
 from pyleem.analysis import Analyzer
-from pyleem.desp import DESPAnalyzer, DESPGroup, calibrate_desp
+from pyleem.desp import DESPAnalyzer, DESPConfig, DESPGroup, calibrate_desp
 import glob
 import matplotlib.pyplot as plt
 
 # DESP calibration
+
+# from config file
+config = DESPConfig("desp_config.toml")
+cal_result = config.calibrate(update=True)
+potential_func = cal_result["potential_func"]
+
+# manually
 Au_paths = sorted(glob.glob("Au/*.dat"))
 cal_result = calibrate_desp([Analyzer(path) for path in Au_paths])
 potential_func = cal_result["potential_func"]

@@ -11,12 +11,14 @@ calibrated reference. A built-in Gaussian filter smooths the profile; its sigma
 is set at construction time.
 
 {py:class}`~pyleem.sees.SEESGroup` processes a time series of files.
+{py:class}`~pyleem.sees.SEESConfig` drives calibration from a TOML config file
+(see the `config` module).
 
 
 ## Example
 
 ```python
-from pyleem.sees import SEESAnalyzer, SEESGroup, calibrate_sees
+from pyleem.sees import SEESAnalyzer, SEESConfig, SEESGroup, calibrate_sees
 from pyleem.roi import LineROI
 from pyleem.analysis import ProfileAnalyzer
 import glob
@@ -25,20 +27,22 @@ import matplotlib.pyplot as plt
 # SEES calibration
 
 # from config file
-base_params, cal_params = read_config("config.toml")
-roi = base_params["roi"]
-paths = base_params["paths"]
+config = SEESConfig("config.toml")
+cal_result = config.calibrate(update=True)
+pixel_per_ev = cal_result["pixel_per_ev"]
+peak_shift = cal_result["peak_shift"]
 
 # manually set the paths
 roi = LineROI(src=(256, 10), dst=(256, 500), linewidth=20)
 paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
-cal_result = calibrate_sees([ProfileAnalyzer(path, roi) for path in paths])
+cal_params = {"sigma": 10}  # optionally override pixel_per_ev, peak_shift, or sigma
+cal_result = calibrate_sees([ProfileAnalyzer(path, roi) for path in paths], cal_params)
 pixel_per_ev, peak_shift = cal_result["pixel_per_ev"], cal_result["peak_shift"]
 
 
 # SEESAnalyzer
 analyzer = SEESAnalyzer("data.dat", roi, pixel_per_ev, peak_shift, sigma=10)
-print(f"Potential: {analyzer.surface_potential:.3f} eV")
+print(f"Potential: {analyzer.potential:.3f} eV")
 
 fig, ax = plt.subplots()
 analyzer.plot(ax, show_fit=True)
