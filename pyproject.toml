@@ -50,6 +50,9 @@ omit = ["tests/*"]
 [tool.tox]
 env_list = ["py311", "py312", "coverage", "docs"]
 
+[tool.tox.gh-actions]
+python = { "3.11" = "py311", "3.12" = "py312" }
+
 [tool.tox.env_run_base]
 package = "wheel"
 extras = ["test"]
