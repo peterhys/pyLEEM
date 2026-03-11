@@ -1,24 +1,22 @@
-# `pyleem.stitch`
+# `pyleem.analysis.stitch`
 
 Profile stitching for combining multiple overlapping spectra into a single
 continuous spectrum.
 
-{py:class}`~pyleem.stitch.StitchGroup` accepts a list of same-type
-`ProfileAnalyzer` instances whose abscissa ranges overlap. It sorts them by
-their minimum abscissa value, computes or accepts explicit stitch points, and
-delegates concatenation to {py:func}`~pyleem.utils.stitch_profiles`.
-
-The result is exposed through the {py:attr}`~pyleem.stitch.StitchGroup.stitched_analyzer`
-property, which returns a {py:class}`~pyleem.stitch.StitchAnalyzer`. This
-lightweight object stores `abscissa`, `ordinate`, and the axis labels, and
-forwards any method call that exists on the source analyzer class via
-`__getattr__`.
+{py:class}`~pyleem.analysis.stitch.StitchAnalyzer` is a subclass of
+{py:class}`~pyleem.analyzer.ProfileAnalyzer` that combines a list of same-type
+analyzers with overlapping abscissa ranges into one continuous profile. The
+analyzers are sorted by their minimum abscissa value. The stitch points are either
+supplied explicitly or auto-computed via {py:func}`~pyleem.utils.find_stitch_points`
+using a `stitch_method` (`'midpoint'`, `'start'`, or `'end'`). Because it has no
+file, `image` and `reader` are unavailable; metadata can be passed directly to
+the constructor.
 
 ## Example
 
 ```python
-from pyleem.xps import XPSAnalyzer
-from pyleem.stitch import StitchGroup
+from pyleem.analysis.xps import XPSAnalyzer
+from pyleem.analysis.stitch import StitchAnalyzer
 from pyleem.roi import LineROI
 import matplotlib.pyplot as plt
 
@@ -30,27 +28,21 @@ analyzers = [
     for path in ["data_280eV.dat", "data_284eV.dat", "data_288eV.dat"]
 ]
 
-# Auto-compute stitch points at the midpoint of each overlap
-group = StitchGroup(analyzers, method="midpoint")
+# Generate the stitch analyzer
+stitch_analyzer = StitchAnalyzer(analyzers, stitch_method="midpoint")
 
-print(group.stitch_points)  # list of N-1 cut values
-
-# Access the stitched result
-stitched = group.stitched_analyzer
-print(stitched.abscissa_label)  # "Binding Energy [eV]"
-
-# Plot the stitched spectrum — method forwarded from XPSAnalyzer
-fig, ax = plt.subplots()
-stitched.plot_profile(ax)
-plt.show()
+print(stitch_analyzer.stitch_points)
+print(stitch_analyzer.abscissa_label) # Binding Energy [eV]
 
 # Provide explicit stitch points instead
-group = StitchGroup(analyzers, stitch_points=[195.0, 197.5])
-stitched = group.stitched_analyzer
+# And provide metadata
+stitch_analyzer = StitchAnalyzer(
+    analyzers, stitch_points=[195.0, 197.5], metadata={"Incident Voltage": (400, "eV")}
+)
 ```
 
 ```{eval-rst}
-.. automodule:: pyleem.stitch
+.. automodule:: pyleem.analysis.stitch
    :members:
    :show-inheritance:
 ```

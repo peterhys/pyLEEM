@@ -1,26 +1,26 @@
-# `pyleem.sees`
+# `pyleem.analysis.sees`
 
 Secondary Electron Energy Spectroscopy (SEES) analysis.
 
-{py:func}`~pyleem.sees.calibrate_sees` derives `pixel_per_ev` and `peak_shift`
+{py:func}`~pyleem.analysis.sees.calibrate_sees` derives `pixel_per_ev` and `peak_shift`
 from multiple scans acquired at known start voltages and returns the calibration
 result as a dict.
-{py:class}`~pyleem.sees.SEESAnalyzer` extracts the SE onset from a single profile
+{py:class}`~pyleem.analysis.sees.SEESAnalyzer` extracts the SE onset from a single profile
 and calculates the surface potential by comparing the onset position to a
 calibrated reference. A built-in Gaussian filter smooths the profile; its sigma
 is set at construction time.
 
-{py:class}`~pyleem.sees.SEESGroup` processes a time series of files.
-{py:class}`~pyleem.sees.SEESConfig` drives calibration from a TOML config file
+{py:class}`~pyleem.analysis.sees.SEESGroup` processes a time series of files.
+{py:class}`~pyleem.analysis.sees.SEESConfig` drives calibration from a TOML config file
 (see the `config` module).
 
 
 ## Example
 
 ```python
-from pyleem.sees import SEESAnalyzer, SEESConfig, SEESGroup, calibrate_sees
+from pyleem.analysis.sees import SEESAnalyzer, SEESConfig, SEESGroup, calibrate_sees
 from pyleem.roi import LineROI
-from pyleem.analysis import ProfileAnalyzer
+from pyleem.analyzer import ProfileAnalyzer
 import glob
 import matplotlib.pyplot as plt
 
@@ -57,7 +57,7 @@ time_intervals = group.get_time_intervals()
 ```
 
 ```{eval-rst}
-.. automodule:: pyleem.sees
+.. automodule:: pyleem.analysis.sees
    :members:
    :show-inheritance:
 ```

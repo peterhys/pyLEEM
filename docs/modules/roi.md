@@ -28,4 +28,5 @@ roi.to_roi_object().tofile("line.roi")
 .. automodule:: pyleem.roi
    :members:
    :show-inheritance:
+   :exclude-members: reduce_func
 ```

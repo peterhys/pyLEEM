@@ -1,6 +1,6 @@
-# module reference
+# Module References
 
-Reference documentation for the `pyleem` package and its analysis modules.
+Reference documentation for the `pyleem` package modules.
 
 ```{toctree}
 :maxdepth: 1

@@ -1,25 +1,25 @@
-# `pyleem.xps`
+# `pyleem.analysis.xps`
 
 X-ray Photoelectron Spectroscopy (XPS) analysis.
 
-{py:class}`~pyleem.xps.XPSAnalyzer` converts the pixel axis to a binding energy
+{py:class}`~pyleem.analysis.xps.XPSAnalyzer` converts the pixel axis to a binding energy
 scale using the incident photon energy and the ROI calibration. Basic peak fitting uses a
 Shirley background subtraction and a pseudo-Voigt model via `lmfit`.
 
-{py:class}`~pyleem.xps.XPSGroup` processes multiple spectra together.
-{py:func}`~pyleem.xps.calibrate_xps` derives `pixel_per_ev` and `peak_shift` by
+{py:class}`~pyleem.analysis.xps.XPSGroup` processes multiple spectra together.
+{py:func}`~pyleem.analysis.xps.calibrate_xps` derives `pixel_per_ev` and `peak_shift` by
 fitting peaks in pixel space across scans acquired at known start voltages. Pass
 `incident_voltage` and optionally `ref_index` / `ref_value` in `cal_params` to
 anchor the energy scale to a known reference peak.
 
-{py:class}`~pyleem.xps.XPSConfig` drives calibration from a TOML config file
+{py:class}`~pyleem.analysis.xps.XPSConfig` drives calibration from a TOML config file
 (see the `config` module).
 
 ## Example
 
 ```python
-from pyleem.xps import XPSAnalyzer, XPSConfig, XPSGroup, calibrate_xps
-from pyleem.analysis import ProfileAnalyzer
+from pyleem.analysis.xps import XPSAnalyzer, XPSConfig, XPSGroup, calibrate_xps
+from pyleem.analyzer import ProfileAnalyzer
 from pyleem.roi import LineROI
 import glob
 import matplotlib.pyplot as plt
@@ -66,7 +66,7 @@ group = XPSGroup(paths, roi, pixel_per_ev, peak_shift, incident_voltage=400)
 ```
 
 ```{eval-rst}
-.. automodule:: pyleem.xps
+.. automodule:: pyleem.analysis.xps
    :members:
    :show-inheritance:
 ```

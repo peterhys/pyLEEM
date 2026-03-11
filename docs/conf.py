@@ -27,6 +27,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 autosummary_generate = True
 autodoc_member_order = "bysource"
 autodoc_typehints = "description"
+autodoc_preserve_defaults = True
 autodoc_default_options = {
     "members": True,
     "show-inheritance": True,

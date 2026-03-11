@@ -28,7 +28,7 @@ profile = roi.read_profile(image)  # 1D ndarray
 
 ## Subclassing `Reader`
 
-Implement a custom reader to support other file formats.  All four abstract
+Implement a custom reader to support other file formats.  Both abstract
 methods must be provided.
 
 ```python
@@ -49,12 +49,9 @@ class MyReader(Reader):
     def read_image(self):
         # Return a 2D ndarray (height, width).
         return np.zeros((512, 512), dtype=np.uint16)
-
-    def __lt__(self, other):
-        return self.path < other.path
 ```
 
-Pass your reader by subclassing `Analyzer` directly (see `pyleem.analysis`).
+Pass your reader by subclassing `Analyzer` directly (see `pyleem.analyzer`).
 
 ```{eval-rst}
 .. automodule:: pyleem.reader
