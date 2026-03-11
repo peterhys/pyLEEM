@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change `filtered_profile` method to `process_profile`
 - Change `calibrate` module to `config` module.
 - Change configuration file logic and calibration method for domain specific analyzers.
+- Rename `analysis.py` to `analyzer.py`.
+- Move `StitchAnalyzer` to `pyleem.analysis.stitch` module.
+- Move domain specific modules under analysis/ submodule.
 
 
 ## [0.1.1]
