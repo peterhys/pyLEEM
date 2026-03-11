@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move the calibration output the analyzer group for a cleaner logic. Both domain analyer and
   analyer group requires calibration parameters.
 - Change `filtered_profile` method to `process_profile`
+- Change `calibrate` module to `config` module.
+- Change configuration file logic and calibration method for domain specific analyzers.
 
 
 ## [0.1.1]
