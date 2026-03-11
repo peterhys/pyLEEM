@@ -12,6 +12,7 @@ metadata
 metainfo
 utils
 analysis
+stitch
 sees
 desp
 xps

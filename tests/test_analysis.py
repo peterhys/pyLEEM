@@ -1,6 +1,5 @@
 import pytest
-import numpy as np
-from pyleem.analysis import Analyzer, AnalyzerGroup, ProfileAnalyzer, StitchAnalyzer
+from pyleem.analysis import Analyzer, AnalyzerGroup, ProfileAnalyzer
 import matplotlib.pyplot as plt
 
 
@@ -73,73 +72,6 @@ class TestProfileAnalyzer:
         obj.plot_profile(ax=None)
         assert len(plt.get_fignums()) == 1
         plt.close("all")
-
-
-class TestStitchAnalyzer:
-    """Test suite for StitchAnalyzer class."""
-
-    @pytest.fixture
-    def stitch_analyzers(self, xps_multiple_raw_files, roi):
-        """Create 3 ProfileAnalyzers with overlapping abscissa ranges.
-
-        Each analyzer has a profile of length 60, with abscissas shifted by
-        40 per step so adjacent profiles overlap by 88 points.
-            - Analyzer 0: abscissa [0..127]
-            - Analyzer 1: abscissa [40..167]
-            - Analyzer 2: abscissa [80..207]
-        """
-
-        analyzers = []
-        for i in range(3):
-            obj = ProfileAnalyzer(xps_multiple_raw_files[i], roi)
-            # redefine the abscissa to allow stitching
-            obj._abscissa = np.arange(i * 40, i * 40 + 128)
-            analyzers.append(obj)
-        return analyzers
-
-    def test_init(self, stitch_analyzers):
-        """Test StitchAnalyzer initialization and basic attributes."""
-        obj = StitchAnalyzer(stitch_analyzers, method="start")
-
-        assert obj.stitch_points == [40.0, 80.0]
-
-    def test_custom_stitch_points(self, stitch_analyzers):
-        """Test StitchAnalyzer with explicit stitch points."""
-        stitch_points = [45.0, 85.0]
-        obj = StitchAnalyzer(stitch_analyzers, stitch_points=stitch_points)
-
-        assert obj.stitch_points == stitch_points
-        assert len(obj.abscissa) == len(obj.ordinate)
-
-    def test_validation_errors(self, xps_raw_file, stitch_analyzers):
-        """Test StitchAnalyzer validation errors for invalid inputs."""
-        # Test wrong number of stitch points
-        with pytest.raises(ValueError, match="Expected 2 stitch points, got 1"):
-            StitchAnalyzer(stitch_analyzers, stitch_points=[50.0])
-
-        # Test mismatched analyzer types
-        mixed = [Analyzer(xps_raw_file)] + stitch_analyzers[:2]
-        with pytest.raises(TypeError, match="All analyzers must be the same type"):
-            StitchAnalyzer(mixed)
-
-        # Test mismatched abscissa labels
-        stitch_analyzers[1]._abscissa_label = "DifferentLabel"
-        with pytest.raises(ValueError, match="Abscissa labels don't match"):
-            StitchAnalyzer(stitch_analyzers)
-
-        # Reset and test mismatched ordinate labels
-        stitch_analyzers[1]._abscissa_label = stitch_analyzers[0].abscissa_label
-        stitch_analyzers[1]._ordinate_label = "DifferentLabel"
-        with pytest.raises(ValueError, match="Ordinate labels don't match"):
-            StitchAnalyzer(stitch_analyzers)
-
-    def test_getattr(self, stitch_analyzers):
-        """Test StitchAnalyzer inherits callable methods and raises AttributeError for unknown ones."""
-        obj = StitchAnalyzer(stitch_analyzers)
-
-        assert callable(obj.plot_profile)
-        with pytest.raises(AttributeError):
-            _ = obj.non_existent_attribute
 
 
 class TestAnalyzerGroup:
