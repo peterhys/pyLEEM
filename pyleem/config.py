@@ -99,6 +99,7 @@ class Config:
         """Calibrate using the calibration parameters.
 
         The subclass should define the calibrate_results method.
+        Additional keyword arguments are passed to the calibrate_results method.
         """
 
         cal_section = self.read_section("calibration")

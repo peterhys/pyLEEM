@@ -57,24 +57,25 @@ def get_radius(image):
     return x, y, radius
 
 
-def calibrate_desp(analyzers):
+def calibrate_desp(analyzers, metadata=None):
     """Calibrate radius to potential using multiple images.
 
     Uses linear interpolation to map pattern radii to electron energies.
 
     :param list analyzers: List of Analyzer objects.
-    :param dict cal_params: Dictionary with 'paths' and 'parameters'.
+    :param dict metadata: Optional dictionary with a 'Start Voltage' key whose value
+        is a list of voltages. If None, the start voltage is read from each analyzer's metadata.
     :return: Interpolation function mapping radius to potential (potential_func).
     :rtype: dict
     """
 
     radii = []
-    start_voltages = []
+    start_voltages = [] if metadata is None else metadata["Start Voltage"]
     for analyzer in analyzers:
-        image = preprocess_image(analyzer.image)
-        x, y, radius = get_radius(image)
+        _, _, radius = get_radius(preprocess_image(analyzer.image))
         radii.append(radius)
-        start_voltages.append(analyzer.metadata["Start Voltage"][0])
+        if metadata is None:
+            start_voltages.append(analyzer.metadata["Start Voltage"][0])
 
     interp_func = interp1d(
         radii,
@@ -102,8 +103,9 @@ class DESPConfig(Config):
         paths = sorted(self.get_patterned_paths(cal_section["path_pattern"]))
         # assert len(paths) > 0, "No files found in the directory"
         analyzers = [Analyzer(path) for path in paths]
+        metadata = cal_section.get("metadata", None)
 
-        return calibrate_desp(analyzers)
+        return calibrate_desp(analyzers, metadata)
 
 
 class DESPAnalyzer(Analyzer):

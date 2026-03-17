@@ -72,6 +72,22 @@ class TestCalibrateSEES:
         assert cal_result["pixel_per_ev"] == 16.0
         assert np.isclose(cal_result["peak_shift"], 3.75, rtol=0.1)
 
+    def test_calibrate_sees_metadata_equivalent(self, sees_multiple_raw_files, roi):
+        """Supplying the same voltages as analyzer metadata gives identical result."""
+        analyzers = [ProfileAnalyzer(f, roi) for f in sees_multiple_raw_files]
+        metadata = {"Start Voltage": [0.0, 1.0, 2.0]}
+        cal_result = calibrate_sees(analyzers, {"sigma": 0}, metadata=metadata)
+        assert cal_result["pixel_per_ev"] == 16.0
+        assert np.isclose(cal_result["peak_shift"], 3.75, rtol=0.1)
+
+    def test_calibrate_sees_metadata_overrides(self, sees_multiple_raw_files, roi):
+        """Supplying different voltages overrides the analyzer metadata."""
+        analyzers = [ProfileAnalyzer(f, roi) for f in sees_multiple_raw_files]
+        # doubling the voltage step should halve pixel_per_ev
+        metadata = {"Start Voltage": [0.0, 2.0, 4.0]}
+        cal_result = calibrate_sees(analyzers, {"sigma": 0}, metadata=metadata)
+        assert np.isclose(cal_result["pixel_per_ev"], 8.0, rtol=0.1)
+
     def test_calibrate_sees_with_pixel_per_ev(self, sees_multiple_raw_files, roi):
         """Test calibrate_sees function with pixel_per_ev."""
         analyzers = [
@@ -147,3 +163,21 @@ class TestSEESConfig:
         persisted = config.read_section("calibration.result")
         assert np.isclose(persisted["pixel_per_ev"], 16.0, rtol=0.1)
         assert np.isclose(persisted["peak_shift"], 3.75, rtol=0.1)
+
+    def test_calibrate_with_metadata_section(
+        self, tmp_path, roi_file, sees_multiple_raw_files
+    ):
+        """[calibration.metadata] overrides start voltages read from analyzer files."""
+        path_list = ", ".join(f'"{f.name}"' for f in sees_multiple_raw_files)
+        content = (
+            '[base]\nroi = "test.roi"\n'
+            f"[calibration]\npaths = [{path_list}]\n"
+            "[calibration.parameters]\nsigma = 0\n"
+            # doubling the voltage step should halve pixel_per_ev
+            '[calibration.metadata]\n"Start Voltage" = [0.0, 2.0, 4.0]\n'
+        )
+        config_path = tmp_path / "sees_config_meta.toml"
+        config_path.write_text(content)
+
+        result = SEESConfig(config_path).calibrate()
+        assert np.isclose(result["pixel_per_ev"], 8.0, rtol=0.1)

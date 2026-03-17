@@ -171,7 +171,7 @@ def fit_xps(profile, abscissa, baseline, peak_labels, constraints):
     return result, bg
 
 
-def calibrate_xps(analyzers, cal_params):
+def calibrate_xps(analyzers, cal_params, metadata=None):
     """Calibrate pixel_per_eV and peak_shift using multiple spectra."""
 
     baselines = cal_params["baselines"]
@@ -201,9 +201,12 @@ def calibrate_xps(analyzers, cal_params):
         peak_results.append(peaks)
         bgs.append(bg)
 
-    start_voltages = np.array(
-        [analyzer.metadata["Start Voltage"][0] for analyzer in analyzers]
-    )
+    if metadata is not None:
+        start_voltages = np.array(metadata["Start Voltage"])
+    else:
+        start_voltages = np.array(
+            [analyzer.metadata["Start Voltage"][0] for analyzer in analyzers]
+        )
     delta_ev = np.diff(start_voltages)
 
     if "pixel_per_ev" in cal_params:
@@ -254,7 +257,8 @@ class XPSConfig(Config):
         paths = self.get_paths(cal_section["paths"])
         analyzers = [ProfileAnalyzer(path, roi) for path in paths]
         cal_params = cal_section.get("parameters", {})
-        return calibrate_xps(analyzers, cal_params)
+        metadata = cal_section.get("metadata", None)
+        return calibrate_xps(analyzers, cal_params, metadata)
 
 
 class XPSAnalyzer(ProfileAnalyzer):

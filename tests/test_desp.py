@@ -53,6 +53,25 @@ class TestCalibrateDESP:
         assert np.isclose(cal_result["potential_func"](45), 212.5, rtol=0.1)
         assert np.isclose(cal_result["potential_func"](50), 215, rtol=0.1)
 
+    def test_calibrate_desp_metadata_equivalent(self, desp_files):
+        """Supplying the same voltages as analyzer metadata gives identical result."""
+        analyzers = [Analyzer(f) for f in desp_files]
+        metadata = {"Start Voltage": [200.0, 210.0, 220.0]}
+        cal_result = calibrate_desp(analyzers, metadata=metadata)
+        assert np.isclose(cal_result["potential_func"](30), 205, rtol=0.1)
+        assert np.isclose(cal_result["potential_func"](40), 210, rtol=0.1)
+        assert np.isclose(cal_result["potential_func"](50), 215, rtol=0.1)
+
+    def test_calibrate_desp_metadata_overrides(self, desp_files):
+        """Supplying different voltages overrides the analyzer metadata."""
+        analyzers = [Analyzer(f) for f in desp_files]
+        # radii ~20, ~40, ~60 mapped to 100, 200, 300 instead of 200, 210, 220
+        metadata = {"Start Voltage": [100.0, 200.0, 300.0]}
+        cal_result = calibrate_desp(analyzers, metadata=metadata)
+        assert np.isclose(cal_result["potential_func"](20), 100, rtol=0.1)
+        assert np.isclose(cal_result["potential_func"](40), 200, rtol=0.1)
+        assert np.isclose(cal_result["potential_func"](60), 300, rtol=0.1)
+
 
 class TestDESPAnalyzer:
     """Test DESPAnalyzer class."""
@@ -115,3 +134,22 @@ def test_calibrate_reset(tmp_path, desp_files):
     assert callable(func)
     assert np.isclose(func(20), 200, rtol=0.1)
     assert np.isclose(func(60), 220, rtol=0.1)
+
+
+def test_calibrate_with_metadata_section(tmp_path, desp_files):
+    """[calibration.metadata] overrides start voltages read from analyzer files."""
+    content = (
+        '[calibration]\npath_pattern = "*.dat"\n'
+        "[calibration.metadata]\n"
+        '"Start Voltage" = [100.0, 200.0, 300.0]\n'
+    )
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(content)
+
+    result = DESPConfig(config_path).calibrate()
+    func = result["potential_func"]
+    assert callable(func)
+    # radii ~20, ~40, ~60 now map to 100, 200, 300
+    assert np.isclose(func(20), 100, rtol=0.1)
+    assert np.isclose(func(40), 200, rtol=0.1)
+    assert np.isclose(func(60), 300, rtol=0.1)

@@ -21,14 +21,15 @@ def SEES_onset(profile):
     return pk_idx, slope, onset_pos
 
 
-def calibrate_sees(analyzers, cal_params):
+def calibrate_sees(analyzers, cal_params, metadata=None):
     """Calibrate energy scale using onset positions."""
     sigma = cal_params.get("sigma", 10)
     onset_pos = []
-    start_voltages = []
+    start_voltages = [] if metadata is None else metadata["Start Voltage"]
     for analyzer in analyzers:
         onset_pos.append(SEES_onset(analyzer.process_profile(sigma))[2])
-        start_voltages.append(analyzer.metadata["Start Voltage"][0])
+        if metadata is None:
+            start_voltages.append(analyzer.metadata["Start Voltage"][0])
 
     onset_pos = np.array(onset_pos)
 
@@ -51,8 +52,9 @@ class SEESConfig(Config):
         paths = self.get_paths(cal_section["paths"])
         analyzers = [ProfileAnalyzer(path, roi) for path in paths]
         cal_params = cal_section.get("parameters", {})
+        metadata = cal_section.get("metadata", None)
 
-        return calibrate_sees(analyzers, cal_params)
+        return calibrate_sees(analyzers, cal_params, metadata)
 
 
 class SEESAnalyzer(ProfileAnalyzer):

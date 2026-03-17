@@ -238,6 +238,32 @@ class TestXPSCalibration:
         assert np.isclose(cal_result["pixel_per_ev"], 16.0, rtol=0.1)
         assert np.isclose(cal_result["peak_shift"], -4, rtol=0.1)
 
+    def test_calibrate_xps_metadata_equivalent(self, xps_analyzers):
+        """Supplying the same voltages as analyzer metadata gives identical result."""
+        cal_params = {
+            "baselines": [(197, 100)] * 3,
+            "num_peaks": 1,
+            "ref_index": 0,
+            "ref_value": 285.0,
+            "incident_voltage": 400,
+        }
+        metadata = {"Start Voltage": [114.0, 115.0, 116.0]}
+        cal_result = calibrate_xps(xps_analyzers, cal_params, metadata=metadata)
+        assert np.isclose(cal_result["pixel_per_ev"], 16.0, rtol=0.1)
+        assert np.isclose(cal_result["peak_shift"], -4, rtol=0.1)
+
+    def test_calibrate_xps_metadata_overrides(self, xps_analyzers):
+        """Supplying different voltages overrides the analyzer metadata."""
+        cal_params = {
+            "baselines": [(197, 100)] * 3,
+            "num_peaks": 1,
+            "incident_voltage": 400,
+        }
+        # doubling the voltage step should halve pixel_per_ev
+        metadata = {"Start Voltage": [114.0, 116.0, 118.0]}
+        cal_result = calibrate_xps(xps_analyzers, cal_params, metadata=metadata)
+        assert np.isclose(cal_result["pixel_per_ev"], 8.0, rtol=0.1)
+
     def test_calibrate_ppev_without_reference(self, xps_analyzers):
         """Test calibration with pixel_per_ev."""
         cal_params = {
@@ -327,3 +353,27 @@ class TestXPSConfig:
         persisted = config.read_section("calibration.result")
         assert np.isclose(persisted["pixel_per_ev"], 16.0, rtol=0.1)
         assert np.isclose(persisted["peak_shift"], -4.0, rtol=0.1)
+
+    def test_calibrate_with_metadata_section(
+        self, tmp_path, roi, xps_multiple_raw_files
+    ):
+        """[calibration.metadata] overrides start voltages read from analyzer files."""
+        roi_path = tmp_path / "test.roi"
+        roi.to_roi_object().tofile(roi_path)
+
+        path_list = ", ".join(f'"{f.name}"' for f in xps_multiple_raw_files)
+        content = (
+            '[base]\nroi = "test.roi"\n'
+            f"[calibration]\npaths = [{path_list}]\n"
+            "[calibration.parameters]\n"
+            "num_peaks = 1\n"
+            "baselines = [[197, 100], [197, 100], [197, 100]]\n"
+            "incident_voltage = 400\n"
+            # doubling the voltage step should halve pixel_per_ev
+            '[calibration.metadata]\n"Start Voltage" = [114.0, 116.0, 118.0]\n'
+        )
+        config_path = tmp_path / "xps_config_meta.toml"
+        config_path.write_text(content)
+
+        result = XPSConfig(config_path).calibrate()
+        assert np.isclose(result["pixel_per_ev"], 8.0, rtol=0.1)
