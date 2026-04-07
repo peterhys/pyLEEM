@@ -242,7 +242,7 @@ def test_calibrate_reset(tmp_path, desp_files):
 
 
 def test_calibrate_with_metadata_section(tmp_path, desp_files):
-    """[calibration.metadata] overrides start voltages read from analyzer files."""
+    """Test metadata parameter in the config file."""
     content = (
         '[calibration]\npath_pattern = "*.dat"\n'
         "[calibration.metadata]\n"
@@ -255,6 +255,20 @@ def test_calibrate_with_metadata_section(tmp_path, desp_files):
     func = result["potential_func"]
     assert callable(func)
     # radii 20, 40, 60 now map to 10, 34, 74
+    assert func(20) == pytest.approx(10, rel=0.1)
+    assert func(40) == pytest.approx(34, rel=0.1)
+    assert func(60) == pytest.approx(74, rel=0.1)
+
+def test_calibrate_with_window_section(tmp_path, desp_files):
+    """Test window parameter in the config file."""
+    content = (
+        '[calibration]\npath_pattern = "*.dat"\nwindow = [true, true, false]\n'
+        '[calibration.metadata]\n"Start Voltage" = [10, 34, 104]\n'
+    )
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(content)
+    result = DESPConfig(config_path).calibrate()
+    func = result["potential_func"] 
     assert func(20) == pytest.approx(10, rel=0.1)
     assert func(40) == pytest.approx(34, rel=0.1)
     assert func(60) == pytest.approx(74, rel=0.1)

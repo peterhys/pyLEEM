@@ -203,8 +203,9 @@ class DESPConfig(Config):
         # assert len(paths) > 0, "No files found in the directory"
         analyzers = [Analyzer(path) for path in paths]
         metadata = cal_section.get("metadata", None)
+        window = cal_section.get("window", None)
 
-        return calibrate_desp(analyzers, metadata)
+        return calibrate_desp(analyzers, metadata, window)
 
 
 class DESPAnalyzer(Analyzer):
