@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0]
 
+LICENSE changed to BSD 3-Clause license.
+
 ### Changed
 
-- Change 'amorphleed' module to 'desp' module to more accurate describe the diffuse elastic scattering
-  pattern measurement
+- Change license to BSD 3-Clause license.
+- Change "amorphleed" module to "desp" module to more accurate describe the diffuse elastic scattering
+  pattern measurement.
+- Change image processing and radius detect through contour method.
 - Analyzer reader class moved to class attribute.
 - Move the calibration output the analyzer group for a cleaner logic. Both domain analyer and
   analyer group requires calibration parameters.
@@ -21,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move `StitchAnalyzer` to `pyleem.analysis.stitch` module.
 - Move domain specific modules under analysis/ submodule.
 
+### Added
+
+- Add convolution based (template matching) method for desp disk pattern detection
 
 ## [0.1.1]
 

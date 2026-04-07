@@ -229,12 +229,20 @@ def sees_multiple_raw_files(tmp_path, metadata_bytes):
 
 
 @pytest.fixture
-def desp_files(tmp_path, metadata_bytes):
+def desp_potential_func():
+    """Create a potential function."""
+    return lambda x: 0.01 * x**2 + 5
+
+
+@pytest.fixture
+def desp_files(tmp_path, metadata_bytes, desp_potential_func):
     """Create multiple DESP raw files with different circle radii."""
     files = []
 
     for i in range(3):
-        modified_metadata = set_start_voltage(metadata_bytes, 200.0 + i * 10.0)
+        modified_metadata = set_start_voltage(
+            metadata_bytes, desp_potential_func(20 + i * 20)
+        )
         image = np.zeros((256, 128), dtype=np.uint16)
         cv2.circle(image, (64, 128), 20 + i * 20, 1000, -1)
 
@@ -269,9 +277,3 @@ def pixel_per_ev():
 def peak_shift():
     """Create a peak shift function."""
     return 0
-
-
-@pytest.fixture
-def desp_potential_func():
-    """Create a potential function."""
-    return lambda x: 200 + (x - 20) * 0.5

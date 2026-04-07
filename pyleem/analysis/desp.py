@@ -1,70 +1,108 @@
 from pyleem.analyzer import Analyzer, AnalyzerGroup
 import cv2
 import numpy as np
-from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from pyleem.config import Config
+from lmfit import Model
+from functools import partial
+import cv2
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-def preprocess_image(image, gamma=0.5, blur_kernel=5, morph_kernel_size=3):
-    """Preprocess DESP image in circular patterns.
+def preprocess_image(
+    image, gaussian_kernel=3, gaussian_sigma=0, use_morph=True, morph_kernel=3
+):
+    """Preprocess DESP image for disk pattern detection.
 
-    Normalizes image, applies gamma correction for contrast enhancement,
-    median blur for noise reduction, and morphological closing.
+    Applies Gaussian blur, normalization, Otsu thresholding, and morphological operations.
+    The morphological operations are optional.
 
     :param ndarray image: Input image array.
-    :param float gamma: Gamma correction value (< 1 increases contrast).
-    :param int blur_kernel: Kernel size for median blur (must be odd).
-    :param int morph_kernel_size: Kernel size for morphological operations.
+    :param int gaussian_kernel: Kernel size for Gaussian blur (must be odd).
+    :param float gaussian_sigma: Sigma for Gaussian blur.
+    :param bool use_morph: Whether to use morphological operations.
+    :param int morph_kernel: Kernel size for morphological operations.
     :return: Processed image as uint8 in 0-255 range.
     :rtype: ndarray
     """
-    # normalization
-    image_normalized = (image - image.min()) / (image.max() - image.min())
-    # gamma color correction
-    image_enhanced = np.power(image_normalized, gamma)
-    # smoothing while perserve edges
-    image_uint8 = (image_enhanced * 255).astype(np.uint8)
-    image_processed = cv2.medianBlur(image_uint8, blur_kernel)
 
-    # morphological operations to clean up the gaps in images
-    # given that the circle is solid
-    kernel = np.ones((morph_kernel_size, morph_kernel_size), np.uint8)
-    image_processed = cv2.morphologyEx(image_processed, cv2.MORPH_CLOSE, kernel)
+    image_gauss = cv2.GaussianBlur(
+        image, (gaussian_kernel, gaussian_kernel), gaussian_sigma
+    )
+    image_norm = cv2.normalize(image_gauss, None, 0, 255, cv2.NORM_MINMAX).astype(
+        np.uint8
+    )
+    _, image = cv2.threshold(image_norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    return image_processed
+    if use_morph:
+        kernel = np.ones((morph_kernel, morph_kernel), np.uint8)
+        image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
+        image = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+
+    return image
 
 
 def get_radius(image):
-    """Detect and measure the circular pattern in a DESP image.
+    """Detect and measure the disk pattern in a DESP image.
 
-    In this process we assume that there is only one circular pattern in the image.
-    Uses bilateral filtering, Otsu thresholding, contour detection,
-    and minimum enclosing circle to determine center and radius.
+    In this process we assume that there is only one disk pattern in the image.
+    Uses contour detection and minimum enclosing circle to determine center and radius.
 
     :param ndarray image: Preprocessed DESP image (uint8).
-    :return: Circle center (x, y) and radius in pixels.
+    :return: Disk center (x, y) and radius in pixels.
     :rtype: tuple(float, float, float)
     """
 
-    denoised = cv2.bilateralFilter(image, 15, 100, 100)
-    _, binary = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    # largest contour
-    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     largest_contour = max(contours, key=cv2.contourArea)
-    # Get center from minimum enclosing circle
-    (x, y), radius = cv2.minEnclosingCircle(largest_contour)
-    return x, y, radius
+    if len(contours) == 0:
+        raise ValueError("No disk pattern found in image.")
+    (x, y), r = cv2.minEnclosingCircle(largest_contour)
+    return x, y, r
 
 
-def calibrate_desp(analyzers, metadata=None):
+def parabola_fit(voltages, radii, window=None):
+    """Fit a parabola to the voltages and radii.
+
+    :param list voltages: List of voltages.
+    :param list radii: List of radii.
+    :param int window: Window size for the fit.
+    :return: Fit result.
+    :rtype: lmfit.ModelResult
+    """
+
+    voltages = np.asarray(voltages)
+    radii = np.asarray(radii)
+
+    if window is not None:
+        voltages = voltages[window]
+        radii = radii[window]
+
+    def model_func(x, a, c):
+        return a * x**2 + c
+
+    model = Model(model_func)
+    params = model.make_params(a=1e-4, c=0)
+
+    result = model.fit(voltages, params, x=radii)
+
+    fit_func = partial(model_func, **result.best_values)
+    return fit_func, result
+
+
+def calibrate_desp(analyzers, metadata=None, window=None):
     """Calibrate radius to potential using multiple images.
 
     Uses linear interpolation to map pattern radii to electron energies.
+    The disk detection defaults to contour detection.
+    The radius of the pattern is related to the square of the voltage.
+    The relationship is fitted to a parabola.
 
     :param list analyzers: List of Analyzer objects.
     :param dict metadata: Optional dictionary with a 'Start Voltage' key whose value
         is a list of voltages. If None, the start voltage is read from each analyzer's metadata.
+    :param int window: Window size for the fit.
     :return: Interpolation function mapping radius to potential (potential_func).
     :rtype: dict
     """
@@ -72,20 +110,81 @@ def calibrate_desp(analyzers, metadata=None):
     radii = []
     start_voltages = [] if metadata is None else metadata["Start Voltage"]
     for analyzer in analyzers:
-        _, _, radius = get_radius(preprocess_image(analyzer.image))
-        radii.append(radius)
+        _, _, r = get_radius(preprocess_image(analyzer.image))
+        radii.append(r)
         if metadata is None:
             start_voltages.append(analyzer.metadata["Start Voltage"][0])
 
-    interp_func = interp1d(
-        radii,
-        start_voltages,
-        kind="linear",
-        bounds_error=False,
-        fill_value="extrapolate",
-    )
+    fit_function, fit_result = parabola_fit(start_voltages, radii, window=window)
 
-    return {"potential_func": interp_func}
+    return {"potential_func": fit_function, "fit_result": fit_result}
+
+
+def disk_template(r):
+    """Build a mean-centered filled-disk template of radius r."""
+    s = 2 * r + 1
+    y, x = np.ogrid[:s, :s]
+    mask = ((x - r) ** 2 + (y - r) ** 2 <= r**2).astype(np.float32)
+    mask -= mask.mean()
+    return mask
+
+
+def match_score(image, r):
+    """Template matching at one radius.
+
+    Uses normalized cross-correlation.
+    """
+    templ = disk_template(r)
+    res = cv2.matchTemplate(image, templ, cv2.TM_CCOEFF_NORMED)
+    _, max_val, _, max_loc = cv2.minMaxLoc(res)
+    x = max_loc[0] + r
+    y = max_loc[1] + r
+    return max_val, x, y, r
+
+
+def eval_radii(image, radii, use_threads=True, max_workers=None):
+    """Best match over radii, multi-threaded."""
+    best = None
+
+    if use_threads:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(match_score, image, r) for r in radii]
+            for fut in as_completed(futures):
+                score, x, y, r_ = fut.result()
+                if best is None or score > best[0]:
+                    best = (score, x, y, r_)
+    else:
+        for r in radii:
+            score, x, y, r_ = match_score(image, r)
+            if best is None or score > best[0]:
+                best = (score, x, y, r_)
+
+    return best
+
+
+def get_radius_match_template(
+    image, r_min, r_max, step_size, use_threads=True, max_workers=None
+):
+    """Get the radius of the disk pattern in the image.
+
+    :param ndarray image: Input image array.
+    :param int r_min: Minimum radius.
+    :param int r_max: Maximum radius.
+    :param int step_size: Step size.
+    :param bool use_threads: Whether to use threads.
+    :param int max_workers: Maximum number of workers.
+    :return: Best x, y, and radius.
+    :rtype: tuple(float, float, float)
+    """
+
+    img = image.astype(np.float32)
+    image_gauss = cv2.GaussianBlur(img, (3, 3), 0)
+    image_norm = cv2.normalize(image_gauss, None, 0, 1, cv2.NORM_MINMAX)
+
+    radii = list(range(int(r_min), int(r_max) + 1, int(step_size)))
+    _, x, y, r = eval_radii(image_norm, radii, use_threads, max_workers)
+
+    return x, y, r
 
 
 class DESPConfig(Config):
