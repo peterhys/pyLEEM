@@ -14,7 +14,7 @@ def test_sees_onset(sees_array):
 
     assert pk_idx == 57
     assert slope == 12.5
-    assert np.isclose(onset_pos, 40.0, rtol=1e-2)
+    assert onset_pos == pytest.approx(40.0, rel=1e-2)
 
 
 @pytest.fixture
@@ -36,8 +36,8 @@ class TestSEESAnalyzer:
 
         assert sees_analyzer.pk_idx == 57  # filtered profile changes pk_idx
         assert sees_analyzer.slope == 12.5
-        assert np.isclose(sees_analyzer.onset_pos, 40.0, rtol=1e-2)
-        assert np.isclose(sees_analyzer.potential, -2.5, rtol=1e-2)
+        assert sees_analyzer.onset_pos == pytest.approx(40.0, rel=1e-2)
+        assert sees_analyzer.potential == pytest.approx(-2.5, rel=1e-2)
 
     def test_transform_abscissa(self, sees_analyzer):
         """Test transform_abscissa method."""
@@ -56,7 +56,7 @@ class TestSEESAnalyzer:
         pk_idx, slope, onset_pos = SEES_onset(profile)
         assert pk_idx == 57
         assert slope == 12.5
-        assert np.isclose(onset_pos, 40.0, rtol=1e-2)
+        assert onset_pos == pytest.approx(40.0, rel=1e-2)
 
 
 class TestCalibrateSEES:
@@ -70,7 +70,7 @@ class TestCalibrateSEES:
         ]
         cal_result = calibrate_sees(analyzers, {"sigma": 0})
         assert cal_result["pixel_per_ev"] == 16.0
-        assert np.isclose(cal_result["peak_shift"], 3.75, rtol=0.1)
+        assert cal_result["peak_shift"] == pytest.approx(3.75, rel=0.1)
 
     def test_calibrate_sees_metadata_equivalent(self, sees_multiple_raw_files, roi):
         """Supplying the same voltages as analyzer metadata gives identical result."""
@@ -78,7 +78,7 @@ class TestCalibrateSEES:
         metadata = {"Start Voltage": [0.0, 1.0, 2.0]}
         cal_result = calibrate_sees(analyzers, {"sigma": 0}, metadata=metadata)
         assert cal_result["pixel_per_ev"] == 16.0
-        assert np.isclose(cal_result["peak_shift"], 3.75, rtol=0.1)
+        assert cal_result["peak_shift"] == pytest.approx(3.75, rel=0.1)
 
     def test_calibrate_sees_metadata_overrides(self, sees_multiple_raw_files, roi):
         """Supplying different voltages overrides the analyzer metadata."""
@@ -86,7 +86,7 @@ class TestCalibrateSEES:
         # doubling the voltage step should halve pixel_per_ev
         metadata = {"Start Voltage": [0.0, 2.0, 4.0]}
         cal_result = calibrate_sees(analyzers, {"sigma": 0}, metadata=metadata)
-        assert np.isclose(cal_result["pixel_per_ev"], 8.0, rtol=0.1)
+        assert cal_result["pixel_per_ev"] == pytest.approx(8.0, rel=0.1)
 
     def test_calibrate_sees_with_pixel_per_ev(self, sees_multiple_raw_files, roi):
         """Test calibrate_sees function with pixel_per_ev."""
@@ -96,7 +96,7 @@ class TestCalibrateSEES:
         ]
         cal_result = calibrate_sees(analyzers, {"pixel_per_ev": 8})
         assert cal_result["pixel_per_ev"] == 8
-        assert np.isclose(cal_result["peak_shift"], 6, rtol=0.1)
+        assert cal_result["peak_shift"] == pytest.approx(6, rel=0.1)
 
     def test_calibrate_sees_with_peak_shift(self, sees_multiple_raw_files, roi):
         """Test calibrate_sees function with peak_shift."""
@@ -145,8 +145,8 @@ class TestSEESConfig:
         """Test SEESConfig.calibrate with reset=True runs SEES calibration."""
 
         result = SEESConfig(sees_config_file).calibrate()
-        assert np.isclose(result["pixel_per_ev"], 16.0, rtol=0.1)
-        assert np.isclose(result["peak_shift"], 3.75, rtol=0.1)
+        assert result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
+        assert result["peak_shift"] == pytest.approx(3.75, rel=0.1)
 
         persisted = SEESConfig(sees_config_file).read_section("calibration.result")
         assert persisted["pixel_per_ev"] == 8.0
@@ -157,12 +157,12 @@ class TestSEESConfig:
 
         config = SEESConfig(sees_config_file)
         result = config.calibrate(update=True)
-        assert np.isclose(result["pixel_per_ev"], 16.0, rtol=0.1)
-        assert np.isclose(result["peak_shift"], 3.75, rtol=0.1)
+        assert result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
+        assert result["peak_shift"] == pytest.approx(3.75, rel=0.1)
 
         persisted = config.read_section("calibration.result")
-        assert np.isclose(persisted["pixel_per_ev"], 16.0, rtol=0.1)
-        assert np.isclose(persisted["peak_shift"], 3.75, rtol=0.1)
+        assert persisted["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
+        assert persisted["peak_shift"] == pytest.approx(3.75, rel=0.1)
 
     def test_calibrate_with_metadata_section(
         self, tmp_path, roi_file, sees_multiple_raw_files
@@ -180,4 +180,4 @@ class TestSEESConfig:
         config_path.write_text(content)
 
         result = SEESConfig(config_path).calibrate()
-        assert np.isclose(result["pixel_per_ev"], 8.0, rtol=0.1)
+        assert result["pixel_per_ev"] == pytest.approx(8.0, rel=0.1)

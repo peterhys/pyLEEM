@@ -52,8 +52,8 @@ def test_parabola_fit():
     voltages = [14, 21, 30]
     radii = [30, 40, 50]
     fit_function, fit_result = parabola_fit(voltages, radii)
-    assert np.isclose(fit_result.best_values["a"], 0.01, rtol=0.1)
-    assert np.isclose(fit_result.best_values["c"], 5, rtol=0.1)
+    assert fit_result.best_values["a"] == pytest.approx(0.01, rel=0.1)
+    assert fit_result.best_values["c"] == pytest.approx(5, rel=0.1)
 
     assert fit_function(35) == 17.25
 
@@ -66,8 +66,8 @@ def test_parabola_fit_window():
     radii = [30, 40, 50, 40]
     window = np.array(voltages) < 40
     fit_function, fit_result = parabola_fit(voltages, radii, window=window)
-    assert np.isclose(fit_result.best_values["a"], 0.01, rtol=0.1)
-    assert np.isclose(fit_result.best_values["c"], 5, rtol=0.1)
+    assert fit_result.best_values["a"] == pytest.approx(0.01, rel=0.1)
+    assert fit_result.best_values["c"] == pytest.approx(5, rel=0.1)
     assert fit_function(35) == 17.25
 
 
@@ -76,7 +76,7 @@ def test_disk_template():
     tmpl = disk_template(10)
     assert tmpl.shape == (21, 21)
     assert tmpl.dtype == np.float32
-    assert np.isclose(tmpl.mean(), 0.0, atol=1e-6)
+    assert tmpl.mean() == pytest.approx(0.0, abs=1e-6)
 
 
 def test_match_score():
@@ -84,10 +84,10 @@ def test_match_score():
     image = np.zeros((100, 100), dtype=np.float32)
     cv2.circle(image, (50, 50), 20, 1000, -1)
     score, x, y, r = match_score(image, 20)
-    assert score == 1.0  # match perfectly
-    assert x == 50
-    assert y == 50
-    assert r == 20
+    assert pytest.approx(score, abs=1e-6) == 1.0  # match perfectly
+    assert pytest.approx(x, abs=1e-6) == 50
+    assert pytest.approx(y, abs=1e-6) == 50
+    assert pytest.approx(r, abs=1e-6) == 20
 
 
 def test_center_and_radius():
@@ -98,9 +98,9 @@ def test_center_and_radius():
         cv2.circle(img, (x, y), r, 1000, -1)
         x_, y_, r_ = get_radius_match_template(img, r_min=20, r_max=40, step_size=2)
 
-        assert x_ == x
-        assert y_ == y
-        assert r_ == r
+        assert pytest.approx(x_, abs=1e-6) == x
+        assert pytest.approx(y_, abs=1e-6) == y
+        assert pytest.approx(r_, abs=1e-6) == r
 
 
 class TestEvalRadii:
@@ -117,20 +117,26 @@ class TestEvalRadii:
         """Multi-threaded search finds the correct radius."""
         radii = [10, 15, 20, 25, 30]
         _, _, _, best_r = eval_radii(disk_image, radii, use_threads=True)
-        assert best_r == 20
+        assert pytest.approx(best_r, abs=1e-6) == 20
 
     def test_best_radius_sequential(self, disk_image):
         """Sequential search finds the correct radius."""
         radii = [10, 15, 20, 25, 30]
         _, _, _, best_r = eval_radii(disk_image, radii, use_threads=False)
-        assert best_r == 20
+        assert pytest.approx(best_r, abs=1e-6) == 20
 
     def test_single_radius(self, disk_image):
         """Single-element radii list still returns a valid result."""
         result = eval_radii(disk_image, [20], use_threads=False)
-        assert result == (1.0, 60, 60, 20)
+        assert pytest.approx(result[0], abs=1e-6) == 1.0
+        assert pytest.approx(result[1], abs=1e-6) == 60
+        assert pytest.approx(result[2], abs=1e-6) == 60
+        assert pytest.approx(result[3], abs=1e-6) == 20
         result = eval_radii(disk_image, [20], use_threads=True)
-        assert result == (1.0, 60, 60, 20)
+        assert pytest.approx(result[0], abs=1e-6) == 1.0
+        assert pytest.approx(result[1], abs=1e-6) == 60
+        assert pytest.approx(result[2], abs=1e-6) == 60
+        assert pytest.approx(result[3], abs=1e-6) == 20
 
 
 class TestCalibrateDESP:
@@ -141,20 +147,20 @@ class TestCalibrateDESP:
         analyzers = [Analyzer(desp_raw_file) for desp_raw_file in desp_files]
         cal_result = calibrate_desp(analyzers)
 
-        assert np.isclose(cal_result["potential_func"](30), 14, rtol=0.1)
-        assert np.isclose(cal_result["potential_func"](35), 17.25, rtol=0.1)
-        assert np.isclose(cal_result["potential_func"](40), 21, rtol=0.1)
-        assert np.isclose(cal_result["potential_func"](45), 25.25, rtol=0.1)
-        assert np.isclose(cal_result["potential_func"](50), 30, rtol=0.1)
+        assert cal_result["potential_func"](30) == pytest.approx(14, rel=0.1)
+        assert cal_result["potential_func"](35) == pytest.approx(17.25, rel=0.1)
+        assert cal_result["potential_func"](40) == pytest.approx(21, rel=0.1)
+        assert cal_result["potential_func"](45) == pytest.approx(25.25, rel=0.1)
+        assert cal_result["potential_func"](50) == pytest.approx(30, rel=0.1)
 
     def test_calibrate_desp_metadata_equivalent(self, desp_files):
         """Supplying the same voltages as analyzer metadata gives identical result."""
         analyzers = [Analyzer(f) for f in desp_files]
         metadata = {"Start Voltage": [9.0, 21.0, 41.0]}
         cal_result = calibrate_desp(analyzers, metadata=metadata)
-        assert np.isclose(cal_result["potential_func"](30), 14, rtol=0.1)
-        assert np.isclose(cal_result["potential_func"](40), 21, rtol=0.1)
-        assert np.isclose(cal_result["potential_func"](50), 30, rtol=0.1)
+        assert cal_result["potential_func"](30) == pytest.approx(14, rel=0.1)
+        assert cal_result["potential_func"](40) == pytest.approx(21, rel=0.1)
+        assert cal_result["potential_func"](50) == pytest.approx(30, rel=0.1)
 
     def test_calibrate_desp_metadata_overrides(self, desp_files):
         """Supplying different voltages overrides the analyzer metadata.
@@ -166,9 +172,9 @@ class TestCalibrateDESP:
 
         metadata = {"Start Voltage": [10, 34, 74]}
         cal_result = calibrate_desp(analyzers, metadata=metadata)
-        assert np.isclose(cal_result["potential_func"](30), 20, rtol=0.1)
-        assert np.isclose(cal_result["potential_func"](50), 52, rtol=0.1)
-        assert np.isclose(cal_result["potential_func"](70), 100, rtol=0.1)
+        assert cal_result["potential_func"](30) == pytest.approx(20, rel=0.1)
+        assert cal_result["potential_func"](50) == pytest.approx(52, rel=0.1)
+        assert cal_result["potential_func"](70) == pytest.approx(100, rel=0.1)
 
 
 class TestDESPAnalyzer:
@@ -183,7 +189,7 @@ class TestDESPAnalyzer:
         """Test analyzer initialization."""
         assert desp_analyzer.x == 64
         assert desp_analyzer.y == 128
-        assert np.isclose(desp_analyzer.radius, 40, rtol=0.1)
+        assert desp_analyzer.radius == pytest.approx(40, rel=0.1)
 
     def test_processed_image_property(self, desp_analyzer):
         """Test processed_image property."""
@@ -230,9 +236,9 @@ def test_calibrate_reset(tmp_path, desp_files):
     result = DESPConfig(config_path).calibrate()
     func = result["potential_func"]
     assert callable(func)
-    assert np.isclose(func(20), 9, rtol=0.1)
-    assert np.isclose(func(40), 21, rtol=0.1)
-    assert np.isclose(func(60), 41, rtol=0.1)
+    assert func(20) == pytest.approx(9, rel=0.1)
+    assert func(40) == pytest.approx(21, rel=0.1)
+    assert func(60) == pytest.approx(41, rel=0.1)
 
 
 def test_calibrate_with_metadata_section(tmp_path, desp_files):
@@ -249,6 +255,6 @@ def test_calibrate_with_metadata_section(tmp_path, desp_files):
     func = result["potential_func"]
     assert callable(func)
     # radii 20, 40, 60 now map to 10, 34, 74
-    assert np.isclose(func(20), 10, rtol=0.1)
-    assert np.isclose(func(40), 34, rtol=0.1)
-    assert np.isclose(func(60), 74, rtol=0.1)
+    assert func(20) == pytest.approx(10, rel=0.1)
+    assert func(40) == pytest.approx(34, rel=0.1)
+    assert func(60) == pytest.approx(74, rel=0.1)

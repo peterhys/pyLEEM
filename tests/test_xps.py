@@ -235,8 +235,8 @@ class TestXPSCalibration:
         }
 
         cal_result = calibrate_xps(xps_analyzers, cal_params)
-        assert np.isclose(cal_result["pixel_per_ev"], 16.0, rtol=0.1)
-        assert np.isclose(cal_result["peak_shift"], -4, rtol=0.1)
+        assert cal_result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
+        assert cal_result["peak_shift"] == pytest.approx(-4, rel=0.1)
 
     def test_calibrate_xps_metadata_equivalent(self, xps_analyzers):
         """Supplying the same voltages as analyzer metadata gives identical result."""
@@ -249,8 +249,8 @@ class TestXPSCalibration:
         }
         metadata = {"Start Voltage": [114.0, 115.0, 116.0]}
         cal_result = calibrate_xps(xps_analyzers, cal_params, metadata=metadata)
-        assert np.isclose(cal_result["pixel_per_ev"], 16.0, rtol=0.1)
-        assert np.isclose(cal_result["peak_shift"], -4, rtol=0.1)
+        assert cal_result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
+        assert cal_result["peak_shift"] == pytest.approx(-4, rel=0.1)
 
     def test_calibrate_xps_metadata_overrides(self, xps_analyzers):
         """Supplying different voltages overrides the analyzer metadata."""
@@ -262,7 +262,7 @@ class TestXPSCalibration:
         # doubling the voltage step should halve pixel_per_ev
         metadata = {"Start Voltage": [114.0, 116.0, 118.0]}
         cal_result = calibrate_xps(xps_analyzers, cal_params, metadata=metadata)
-        assert np.isclose(cal_result["pixel_per_ev"], 8.0, rtol=0.1)
+        assert cal_result["pixel_per_ev"] == pytest.approx(8.0, rel=0.1)
 
     def test_calibrate_ppev_without_reference(self, xps_analyzers):
         """Test calibration with pixel_per_ev."""
@@ -273,7 +273,7 @@ class TestXPSCalibration:
             "incident_voltage": 400,
         }
         cal_result = calibrate_xps(xps_analyzers, cal_params)
-        assert np.isclose(cal_result["pixel_per_ev"], 8, rtol=0.1)
+        assert cal_result["pixel_per_ev"] == pytest.approx(8, rel=0.1)
         # no reference peak adjustment
         assert np.allclose(cal_result["peak_shift"], 0, rtol=0.1)
 
@@ -335,8 +335,8 @@ class TestXPSConfig:
         """Test XPSConfig.calibrate with reset=True runs XPS calibration."""
 
         result = XPSConfig(xps_config_file).calibrate()
-        assert np.isclose(result["pixel_per_ev"], 16.0, rtol=0.1)
-        assert np.isclose(result["peak_shift"], -4.0, rtol=0.1)
+        assert result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
+        assert result["peak_shift"] == pytest.approx(-4.0, rel=0.1)
 
         persisted = XPSConfig(xps_config_file).read_section("calibration.result")
         assert persisted["pixel_per_ev"] == 8.0
@@ -347,12 +347,12 @@ class TestXPSConfig:
 
         config = XPSConfig(xps_config_file)
         result = config.calibrate(update=True)
-        assert np.isclose(result["pixel_per_ev"], 16.0, rtol=0.1)
-        assert np.isclose(result["peak_shift"], -4.0, rtol=0.1)
+        assert result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
+        assert result["peak_shift"] == pytest.approx(-4.0, rel=0.1)
 
         persisted = config.read_section("calibration.result")
-        assert np.isclose(persisted["pixel_per_ev"], 16.0, rtol=0.1)
-        assert np.isclose(persisted["peak_shift"], -4.0, rtol=0.1)
+        assert persisted["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
+        assert persisted["peak_shift"] == pytest.approx(-4.0, rel=0.1)
 
     def test_calibrate_with_metadata_section(
         self, tmp_path, roi, xps_multiple_raw_files
@@ -376,4 +376,4 @@ class TestXPSConfig:
         config_path.write_text(content)
 
         result = XPSConfig(config_path).calibrate()
-        assert np.isclose(result["pixel_per_ev"], 8.0, rtol=0.1)
+        assert result["pixel_per_ev"] == pytest.approx(8.0, rel=0.1)
