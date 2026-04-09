@@ -2,7 +2,6 @@ from lmfit.models import PseudoVoigtModel
 import numpy as np
 from pyleem.analyzer import ProfileAnalyzer, AnalyzerGroup
 import scipy.signal
-import matplotlib.pyplot as plt
 from pyleem.config import Config
 
 

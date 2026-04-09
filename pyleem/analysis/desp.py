@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 from pyleem.config import Config
 from lmfit import Model
 from functools import partial
-import cv2
-import numpy as np
+from scipy.signal import fftconvolve
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -120,26 +119,26 @@ def calibrate_desp(analyzers, metadata=None, window=None):
     return {"potential_func": fit_function, "fit_result": fit_result}
 
 
-def disk_template(r):
-    """Build a mean-centered filled-disk template of radius r."""
-    s = 2 * r + 1
-    y, x = np.ogrid[:s, :s]
-    mask = ((x - r) ** 2 + (y - r) ** 2 <= r**2).astype(np.float32)
-    mask -= mask.mean()
-    return mask
+def disk_kernel(radius):
+    """Zero-mean filled-disk kernel."""
+    r = int(radius)
+    y, x = np.ogrid[-r : r + 1, -r : r + 1]
+    mask = (x * x + y * y) <= r * r
+    k = mask.astype(np.float32)
+    k -= k.mean()  # zero-mean => robust to offset
+    k /= np.linalg.norm(k) + 1e-12  # normalize
+    return k
 
 
-def match_score(image, r):
-    """Template matching at one radius.
+def match_score(im, radius):
+    """Compute the match score for a given radius.
 
-    Uses normalized cross-correlation.
+    The correlation map is computed using the FFT.
     """
-    templ = disk_template(r)
-    res = cv2.matchTemplate(image, templ, cv2.TM_CCOEFF_NORMED)
-    _, max_val, _, max_loc = cv2.minMaxLoc(res)
-    x = max_loc[0] + r
-    y = max_loc[1] + r
-    return max_val, x, y, r
+    k = disk_kernel(radius)
+    corr = fftconvolve(im, k[::-1, ::-1], mode="same")
+    y, x = np.unravel_index(np.argmax(corr), corr.shape)
+    return corr[y, x], x, y, radius
 
 
 def eval_radii(image, radii, use_threads=True, max_workers=None):
@@ -149,7 +148,7 @@ def eval_radii(image, radii, use_threads=True, max_workers=None):
     if use_threads:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(match_score, image, r) for r in radii]
-            for fut in as_completed(futures):
+            for fut in as_completed(futures):  # the order does not matter
                 score, x, y, r_ = fut.result()
                 if best is None or score > best[0]:
                     best = (score, x, y, r_)
@@ -162,10 +161,12 @@ def eval_radii(image, radii, use_threads=True, max_workers=None):
     return best
 
 
-def get_radius_match_template(
+def get_radius_convolve(
     image, r_min, r_max, step_size, use_threads=True, max_workers=None
 ):
     """Get the radius of the disk pattern in the image.
+
+    The image is processed minimualy by subtracting a background.
 
     :param ndarray image: Input image array.
     :param int r_min: Minimum radius.
@@ -178,11 +179,11 @@ def get_radius_match_template(
     """
 
     img = image.astype(np.float32)
-    image_gauss = cv2.GaussianBlur(img, (3, 3), 0)
-    image_norm = cv2.normalize(image_gauss, None, 0, 1, cv2.NORM_MINMAX)
+    bg = cv2.GaussianBlur(img, (0, 0), 40)
+    img_subtracted = img - bg
 
     radii = list(range(int(r_min), int(r_max) + 1, int(step_size)))
-    _, x, y, r = eval_radii(image_norm, radii, use_threads, max_workers)
+    _, x, y, r = eval_radii(img_subtracted, radii, use_threads, max_workers)
 
     return x, y, r
 

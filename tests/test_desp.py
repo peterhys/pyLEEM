@@ -6,10 +6,10 @@ from pyleem.analysis.desp import (
     get_radius,
     calibrate_desp,
     parabola_fit,
-    disk_template,
+    disk_kernel,
     match_score,
     eval_radii,
-    get_radius_match_template,
+    get_radius_convolve,
     DESPAnalyzer,
     DESPConfig,
     DESPGroup,
@@ -73,7 +73,7 @@ def test_parabola_fit_window():
 
 def test_disk_template():
     """Test disk template function."""
-    tmpl = disk_template(10)
+    tmpl = disk_kernel(10)
     assert tmpl.shape == (21, 21)
     assert tmpl.dtype == np.float32
     assert tmpl.mean() == pytest.approx(0.0, abs=1e-6)
@@ -84,7 +84,6 @@ def test_match_score():
     image = np.zeros((100, 100), dtype=np.float32)
     cv2.circle(image, (50, 50), 20, 1000, -1)
     score, x, y, r = match_score(image, 20)
-    assert pytest.approx(score, abs=1e-6) == 1.0  # match perfectly
     assert pytest.approx(x, abs=1e-6) == 50
     assert pytest.approx(y, abs=1e-6) == 50
     assert pytest.approx(r, abs=1e-6) == 20
@@ -96,7 +95,7 @@ def test_center_and_radius():
     for x, y, r in [(80, 80, 20), (60, 60, 30), (40, 40, 40)]:
         img = np.zeros((180, 180), dtype=np.uint16)
         cv2.circle(img, (x, y), r, 1000, -1)
-        x_, y_, r_ = get_radius_match_template(img, r_min=20, r_max=40, step_size=2)
+        x_, y_, r_ = get_radius_convolve(img, r_min=20, r_max=40, step_size=2)
 
         assert pytest.approx(x_, abs=1e-6) == x
         assert pytest.approx(y_, abs=1e-6) == y
@@ -128,12 +127,12 @@ class TestEvalRadii:
     def test_single_radius(self, disk_image):
         """Single-element radii list still returns a valid result."""
         result = eval_radii(disk_image, [20], use_threads=False)
-        assert pytest.approx(result[0], abs=1e-6) == 1.0
+
         assert pytest.approx(result[1], abs=1e-6) == 60
         assert pytest.approx(result[2], abs=1e-6) == 60
         assert pytest.approx(result[3], abs=1e-6) == 20
         result = eval_radii(disk_image, [20], use_threads=True)
-        assert pytest.approx(result[0], abs=1e-6) == 1.0
+
         assert pytest.approx(result[1], abs=1e-6) == 60
         assert pytest.approx(result[2], abs=1e-6) == 60
         assert pytest.approx(result[3], abs=1e-6) == 20

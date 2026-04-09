@@ -1,6 +1,5 @@
 import pytest
 from pyleem.config import Config
-from pyleem.roi import LineROI
 
 
 def make_config(tmp_path, content):
