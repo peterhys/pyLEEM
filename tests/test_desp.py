@@ -146,20 +146,20 @@ class TestCalibrateDESP:
         analyzers = [Analyzer(desp_raw_file) for desp_raw_file in desp_files]
         cal_result = calibrate_desp(analyzers)
 
-        assert cal_result["potential_func"](30) == pytest.approx(14, rel=0.1)
-        assert cal_result["potential_func"](35) == pytest.approx(17.25, rel=0.1)
-        assert cal_result["potential_func"](40) == pytest.approx(21, rel=0.1)
-        assert cal_result["potential_func"](45) == pytest.approx(25.25, rel=0.1)
-        assert cal_result["potential_func"](50) == pytest.approx(30, rel=0.1)
+        assert cal_result["radius_to_energy_func"](30) == pytest.approx(14, rel=0.1)
+        assert cal_result["radius_to_energy_func"](35) == pytest.approx(17.25, rel=0.1)
+        assert cal_result["radius_to_energy_func"](40) == pytest.approx(21, rel=0.1)
+        assert cal_result["radius_to_energy_func"](45) == pytest.approx(25.25, rel=0.1)
+        assert cal_result["radius_to_energy_func"](50) == pytest.approx(30, rel=0.1)
 
     def test_calibrate_desp_metadata_equivalent(self, desp_files):
         """Supplying the same voltages as analyzer metadata gives identical result."""
         analyzers = [Analyzer(f) for f in desp_files]
         metadata = {"Start Voltage": [9.0, 21.0, 41.0]}
         cal_result = calibrate_desp(analyzers, metadata=metadata)
-        assert cal_result["potential_func"](30) == pytest.approx(14, rel=0.1)
-        assert cal_result["potential_func"](40) == pytest.approx(21, rel=0.1)
-        assert cal_result["potential_func"](50) == pytest.approx(30, rel=0.1)
+        assert cal_result["radius_to_energy_func"](30) == pytest.approx(14, rel=0.1)
+        assert cal_result["radius_to_energy_func"](40) == pytest.approx(21, rel=0.1)
+        assert cal_result["radius_to_energy_func"](50) == pytest.approx(30, rel=0.1)
 
     def test_calibrate_desp_metadata_overrides(self, desp_files):
         """Supplying different voltages overrides the analyzer metadata.
@@ -171,18 +171,18 @@ class TestCalibrateDESP:
 
         metadata = {"Start Voltage": [10, 34, 74]}
         cal_result = calibrate_desp(analyzers, metadata=metadata)
-        assert cal_result["potential_func"](30) == pytest.approx(20, rel=0.1)
-        assert cal_result["potential_func"](50) == pytest.approx(52, rel=0.1)
-        assert cal_result["potential_func"](70) == pytest.approx(100, rel=0.1)
+        assert cal_result["radius_to_energy_func"](30) == pytest.approx(20, rel=0.1)
+        assert cal_result["radius_to_energy_func"](50) == pytest.approx(52, rel=0.1)
+        assert cal_result["radius_to_energy_func"](70) == pytest.approx(100, rel=0.1)
 
 
 class TestDESPAnalyzer:
     """Test DESPAnalyzer class."""
 
     @pytest.fixture
-    def desp_analyzer(self, desp_raw_file, desp_potential_func):
+    def desp_analyzer(self, desp_raw_file, desp_radius_to_energy_func):
         """Create an DESPAnalyzer instance."""
-        return DESPAnalyzer(desp_raw_file, desp_potential_func)
+        return DESPAnalyzer(desp_raw_file, desp_radius_to_energy_func)
 
     def test_init(self, desp_analyzer):
         """Test analyzer initialization."""
@@ -198,18 +198,18 @@ class TestDESPAnalyzer:
         assert desp_analyzer.processed_image.min() == 0
         assert desp_analyzer.processed_image.max() == 255
 
-    def test_potential_func(self, desp_analyzer):
-        """Test potential_func property."""
-        assert desp_analyzer.potential_func(30) == 14
-        assert desp_analyzer.potential_func(35) == 17.25
-        assert desp_analyzer.potential_func(40) == 21
-        assert desp_analyzer.potential_func(45) == 25.25
-        assert desp_analyzer.potential_func(50) == 30
+    def test_radius_to_energy_func(self, desp_analyzer):
+        """Test radius_to_energy_func property."""
+        assert desp_analyzer.radius_to_energy_func(30) == 14
+        assert desp_analyzer.radius_to_energy_func(35) == 17.25
+        assert desp_analyzer.radius_to_energy_func(40) == 21
+        assert desp_analyzer.radius_to_energy_func(45) == 25.25
+        assert desp_analyzer.radius_to_energy_func(50) == 30
 
     def test_potential_non_func_raises(self, desp_files):
-        """Test group initialization with non-function potential_func."""
-        with pytest.raises(AssertionError, match="potential_func must be a callable"):
-            DESPGroup(desp_files, potential_func=1)
+        """Test group initialization with non-function radius_to_energy_func."""
+        with pytest.raises(AssertionError, match="radius_to_energy_func must be a callable"):
+            DESPGroup(desp_files, radius_to_energy_func=1)
 
 
 class TestDESPGroup:
@@ -218,11 +218,11 @@ class TestDESPGroup:
     def test_empty_paths_raises(self):
         """Test group initialization with empty paths."""
         with pytest.raises(AssertionError, match="Paths cannot be empty"):
-            DESPGroup([], potential_func=lambda x: x)
+            DESPGroup([], radius_to_energy_func=lambda x: x)
 
 
 def test_calibrate_reset(tmp_path, desp_files):
-    """Test that the calibrated potential_func interpolates correctly.
+    """Test that the calibrated radius_to_energy_func interpolates correctly.
 
     The desp_files parameter is not used but necessary for maintaining
     the same tmp_path. When the path is searched, the files can be found.
@@ -233,7 +233,7 @@ def test_calibrate_reset(tmp_path, desp_files):
     config_path.write_text(content)
 
     result = DESPConfig(config_path).calibrate()
-    func = result["potential_func"]
+    func = result["radius_to_energy_func"]
     assert callable(func)
     assert func(20) == pytest.approx(9, rel=0.1)
     assert func(40) == pytest.approx(21, rel=0.1)
@@ -251,7 +251,7 @@ def test_calibrate_with_metadata_section(tmp_path, desp_files):
     config_path.write_text(content)
 
     result = DESPConfig(config_path).calibrate()
-    func = result["potential_func"]
+    func = result["radius_to_energy_func"]
     assert callable(func)
     # radii 20, 40, 60 now map to 10, 34, 74
     assert func(20) == pytest.approx(10, rel=0.1)
@@ -267,7 +267,7 @@ def test_calibrate_with_window_section(tmp_path, desp_files):
     config_path = tmp_path / "config.toml"
     config_path.write_text(content)
     result = DESPConfig(config_path).calibrate()
-    func = result["potential_func"] 
+    func = result["radius_to_energy_func"] 
     assert func(20) == pytest.approx(10, rel=0.1)
     assert func(40) == pytest.approx(34, rel=0.1)
     assert func(60) == pytest.approx(74, rel=0.1)

@@ -102,7 +102,7 @@ def calibrate_desp(analyzers, metadata=None, window=None):
     :param dict metadata: Optional dictionary with a 'Start Voltage' key whose value
         is a list of voltages. If None, the start voltage is read from each analyzer's metadata.
     :param int window: Window size for the fit.
-    :return: Interpolation function mapping radius to potential (potential_func).
+    :return: Interpolation function mapping radius to potential (radius_to_energy_func).
     :rtype: dict
     """
 
@@ -116,7 +116,7 @@ def calibrate_desp(analyzers, metadata=None, window=None):
 
     fit_function, fit_result = parabola_fit(start_voltages, radii, window=window)
 
-    return {"potential_func": fit_function, "fit_result": fit_result}
+    return {"radius_to_energy_func": fit_function, "fit_result": fit_result}
 
 
 def disk_kernel(radius):
@@ -199,7 +199,7 @@ class DESPConfig(Config):
     """
 
     def calibrate_results(self, cal_section):
-        """Calibrate radius to potential using multiple images."""
+        """Calibrate radius to electron energy using multiple images."""
         paths = sorted(self.get_patterned_paths(cal_section["path_pattern"]))
         # assert len(paths) > 0, "No files found in the directory"
         analyzers = [Analyzer(path) for path in paths]
@@ -216,22 +216,24 @@ class DESPAnalyzer(Analyzer):
     and measure charging effects through pattern radius changes.
 
     :param str or Path path: Path to LEEM data file.
-    :param callable interp_func: Interpolation function for radius-to-potential conversion.
+    :param callable interp_func: Interpolation function for radius-to-energy conversion.
 
     :ivar float x: X-coordinate of circle center.
     :ivar float y: Y-coordinate of circle center.
     :ivar float radius: Circle radius in pixels.
-    :ivar float potential: Surface potential if interpolation function provided.
+    :ivar float energy: Electron energy if interpolation function provided.
     """
 
-    def __init__(self, path, potential_func):
-        assert callable(potential_func), "potential_func must be a callable"
+    def __init__(self, path, radius_to_energy_func):
+        assert callable(
+            radius_to_energy_func
+        ), "radius_to_energy_func must be a callable"
         super().__init__(path)
 
         self.x, self.y, self.radius = get_radius(self.processed_image)
 
-        self.potential = potential_func(self.radius)
-        self.potential_func = potential_func
+        self.energy = radius_to_energy_func(self.radius)
+        self.radius_to_energy_func = radius_to_energy_func
 
     @property
     def processed_image(self):
@@ -261,18 +263,18 @@ class DESPGroup(AnalyzerGroup):
     :param kwargs: Additional keyword arguments for AnalyzerGroup.
     """
 
-    def __init__(self, paths, potential_func):
+    def __init__(self, paths, radius_to_energy_func):
         assert len(paths) > 0, "Paths cannot be empty"
 
-        self.analyzers = [DESPAnalyzer(path, potential_func) for path in paths]
-        self.potential_func = potential_func
+        self.analyzers = [DESPAnalyzer(path, radius_to_energy_func) for path in paths]
+        self.radius_to_energy_func = radius_to_energy_func
         super().__init__(self.analyzers)
 
-    def plot_potential(self, ax):
-        """Plot the potential vs. time.
+    def plot_energy(self, ax):
+        """Plot the energy vs. time.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
         """
-        ax.plot(self.time_intervals, self.get_attrs("potential"))
+        ax.plot(self.time_intervals, self.get_attrs("energy"))
         ax.set_xlabel("Time [s]")
-        ax.set_ylabel("Potential [V]")
+        ax.set_ylabel("Electron Energy [eV]")
