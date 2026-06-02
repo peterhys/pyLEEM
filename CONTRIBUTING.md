@@ -110,7 +110,7 @@ Please report unacceptable behavior to the maintainer.
 ## License
 
 By contributing to PyLEEM, you agree that your contributions
-will be licensed under the GNU General Public License v3.0.
+will be licensed under the BSD 3-Clause License.
 
 ---
 

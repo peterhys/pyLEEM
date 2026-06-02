@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0]
 
-LICENSE changed to BSD 3-Clause license.
+LICENSE changed to BSD 3-Clause license with BNL/DOE notices.
 
 ### Changed
 
 - Change license to BSD 3-Clause license.
+- Add `NOTICE` with Brookhaven National Laboratory, U.S. Department of Energy,
+  and U.S. Government rights notices.
 - Change "amorphleed" module to "desp" module to more accurate describe the diffuse elastic scattering
   pattern measurement.
 - Change image processing and radius detect through contour method.

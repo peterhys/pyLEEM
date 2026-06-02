@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,8 @@ name = "pyleem"
 version = "0.2.0"
 description = "Low Energy Electron Microscopy data analysis toolkit"
 readme = "README.md"
-license = { text = "BSD-3-Clause" }
+license = "BSD-3-Clause"
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES"]
 authors = [{ name = "Peter Sun", email = "hs859@cornell.edu" }]
 maintainers = [{ name = "Peter Sun", email = "hs859@cornell.edu" }]
 requires-python = ">=3.11"
