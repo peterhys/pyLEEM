@@ -8,11 +8,8 @@ import glob
 
 """
 The configuration file is a TOML file that outlines the necessary parameters
-in a data folder for analysis. Currently, the file is primarily used for
+in a data folder for analysis. Currently, the file is primarily used to
 store calibration parameters and results.
-
-The base section contains the data type. For profile type of files,
-
 
 The file is structured as follows:
 
@@ -91,7 +88,7 @@ class Config:
     def get_patterned_paths(self, pattern):
         """Special function to get the paths from a glob pattern.
 
-        The file paths is unsorted.
+        The file paths are unsorted.
         """
         return glob.glob(str(self.base_dir / pattern))
 
@@ -99,7 +96,6 @@ class Config:
         """Calibrate using the calibration parameters.
 
         The subclass should define the calibrate_results method.
-        Additional keyword arguments are passed to the calibrate_results method.
         """
 
         cal_section = self.read_section("calibration")

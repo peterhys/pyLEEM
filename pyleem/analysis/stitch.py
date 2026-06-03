@@ -7,7 +7,7 @@ class StitchAnalyzer(ProfileAnalyzer):
     """Analyzer to provide basic profile analysis for stitched profile.
 
     The class is a subclass of profile analyzer, with some methods
-    overwritten due its lack of metadata, reader, roi, and image.
+    overwritten due to its lack of metadata, reader, roi, and image.
 
     Metadata can be supplied directly to the class.
     """
@@ -19,7 +19,7 @@ class StitchAnalyzer(ProfileAnalyzer):
 
         :param list analyzers: List of analyzer objects to stitch.
         :param list stitch_points: Explicit stitch points; auto-computed if None.
-        :param str method: Method for auto stitch point
+        :param str stitch_method: Method for auto stitch point
             selection ('midpoint', 'start', 'end'). Defaults to 'midpoint'.
         :raises ValueError: If analyzers have mismatched types or labels.
         """
@@ -44,7 +44,7 @@ class StitchAnalyzer(ProfileAnalyzer):
     def image(self):
         """Raise an error when image is accessed.
 
-        The exception is raise also when plot_image is called.
+        The exception is also raised when plot_image is called.
         """
         raise AttributeError(f"{type(self).__name__} has no image.")
 
@@ -78,7 +78,7 @@ class StitchAnalyzer(ProfileAnalyzer):
         abscissa, ordinate = stitch_profiles(abscissas, ordinates, mask_points)
 
         # Final abscissa
-        # The final abscissa follows the order of the analzers
+        # The final abscissa follows the order of the analyzers
         sorted_indices = np.argsort(abscissa)
         is_descending = self.analyzers[0].abscissa[0] > self.analyzers[0].abscissa[-1]
         sorted_indices = sorted_indices[::-1] if is_descending else sorted_indices

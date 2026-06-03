@@ -120,7 +120,7 @@ def calibrate_desp(analyzers, metadata=None, window=None):
 
 
 def disk_kernel(radius):
-    """Zero-mean filled-disk kernel."""
+    """Build a zero-mean filled-disk kernel."""
     r = int(radius)
     y, x = np.ogrid[-r : r + 1, -r : r + 1]
     mask = (x * x + y * y) <= r * r
@@ -142,7 +142,7 @@ def match_score(im, radius):
 
 
 def eval_radii(image, radii, use_threads=True, max_workers=None):
-    """Best match over radii, multi-threaded."""
+    """Find the best match over radii using multiple threads."""
     best = None
 
     if use_threads:
@@ -166,7 +166,7 @@ def get_radius_convolve(
 ):
     """Get the radius of the disk pattern in the image.
 
-    The image is processed minimualy by subtracting a background.
+    The image is processed minimally by subtracting a background.
 
     :param ndarray image: Input image array.
     :param int r_min: Minimum radius.

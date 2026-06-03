@@ -190,7 +190,7 @@ def parse_leem_data(data):
         elif is_tag_in_range(tag, (104, 104)):
             # camera exposure and average
             # at least in our instrument, the average value is reversed compared to
-            # the menu settings, where the average count is before the settting
+            # the menu settings, where the average count is before the setting
             exposure, average_count, average_mode = struct.unpack(f"<fbb", data[:6])
 
             leemdata["Camera Exposure"] = (exposure, "s")
