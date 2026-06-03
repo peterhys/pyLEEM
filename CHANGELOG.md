@@ -5,11 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0]
+
+LICENSE changed to BSD 3-Clause license with BNL/DOE notices.
+
+### Changed
+
+- Change license to BSD 3-Clause license.
+- Add `NOTICE` with Brookhaven National Laboratory, U.S. Department of Energy,
+  and U.S. Government rights notices.
+- Change "amorphleed" module to "desp" module to more accurate describe the diffuse elastic scattering
+  pattern measurement.
+- Change image processing and radius detect through contour method.
+- Analyzer reader class moved to class attribute.
+- Move the calibration output the analyzer group for a cleaner logic. Both domain analyer and
+  analyer group requires calibration parameters.
+- Change `filtered_profile` method to `process_profile`
+- Change `calibrate` module to `config` module.
+- Change configuration file logic and calibration method for domain specific analyzers.
+- Rename `analysis.py` to `analyzer.py`.
+- Move `StitchAnalyzer` to `pyleem.analysis.stitch` module.
+- Move domain specific modules under analysis/ submodule.
+
+### Added
+
+- Add convolution based (template matching) method for desp disk pattern detection
+
 ## [0.1.1]
 
 ### Fixed
 
 - Fixed the radius detection issue where the radius does not have to be an int.
+
 
 ## [0.1.0]
 

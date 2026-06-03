@@ -73,8 +73,8 @@ def test_stitch_profiles():
     mask_points = [0, 3, 6, 10]
     stitched_x, stitched_y = stitch_profiles(abscissas, profiles, mask_points)
 
-    expected_x = np.array([0, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 10])
-    expected_y = np.array([10, 20, 30, 40, 60, 70, 80, 90, 110, 120, 130, 140, 150])
+    expected_x = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    expected_y = np.array([10, 20, 30, 60, 70, 80, 110, 120, 130, 140, 150])
 
     assert all(stitched_x == expected_x)
     assert all(stitched_y == expected_y)

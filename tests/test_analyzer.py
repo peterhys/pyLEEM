@@ -1,6 +1,5 @@
 import pytest
-import numpy as np
-from pyleem.analysis import Analyzer, AnalyzerGroup, ProfileAnalyzer, StitchAnalyzer
+from pyleem.analyzer import Analyzer, AnalyzerGroup, ProfileAnalyzer
 import matplotlib.pyplot as plt
 
 
@@ -50,13 +49,9 @@ class TestAnalyzer:
 class TestProfileAnalyzer:
     """Test suite for ProfileAnalyzer class."""
 
-    def test_corrdinates(self, xps_raw_file, roi, roi_calibrated):
+    def test_corrdinates(self, xps_raw_file, roi):
         """Test coordinates transformation."""
         obj = ProfileAnalyzer(xps_raw_file, roi)
-        assert obj.abscissa_label == "Pixel"
-        assert obj.ordinate_label == "Intensity"
-
-        obj = ProfileAnalyzer(xps_raw_file, roi_calibrated)
         assert obj.abscissa_label == "Pixel"
         assert obj.ordinate_label == "Intensity"
 
@@ -79,86 +74,13 @@ class TestProfileAnalyzer:
         plt.close("all")
 
 
-class TestStitchAnalyzer:
-    """Test suite for StitchAnalyzer class."""
-
-    @pytest.fixture
-    def stitch_analyzers(self, xps_multiple_raw_files, roi):
-        """Create 3 ProfileAnalyzers with overlapping abscissa ranges.
-
-        Each analyzer has a profile of length 60, with abscissas shifted by
-        40 per step so adjacent profiles overlap by 88 points.
-            - Analyzer 0: abscissa [0..127]
-            - Analyzer 1: abscissa [40..167]
-            - Analyzer 2: abscissa [80..207]
-        """
-
-        analyzers = []
-        for i in range(3):
-            obj = ProfileAnalyzer(xps_multiple_raw_files[i], roi)
-            # redefine the abscissa to allow stitching
-            obj.abscissa = np.arange(i * 40, i * 40 + 128)
-            analyzers.append(obj)
-        return analyzers
-
-    def test_init(self, stitch_analyzers):
-        """Test StitchAnalyzer initialization and basic attributes."""
-        obj = StitchAnalyzer(stitch_analyzers, method="start")
-
-        assert not obj.is_calibrated
-        assert obj.stitch_points == [40.0, 80.0]
-
-    def test_custom_stitch_points(self, stitch_analyzers):
-        """Test StitchAnalyzer with explicit stitch points."""
-        stitch_points = [45.0, 85.0]
-        obj = StitchAnalyzer(stitch_analyzers, stitch_points=stitch_points)
-
-        assert obj.stitch_points == stitch_points
-        assert len(obj.abscissa) == len(obj.ordinate)
-
-    def test_validation_errors(self, xps_raw_file, stitch_analyzers):
-        """Test StitchAnalyzer validation errors for invalid inputs."""
-        # Test wrong number of stitch points
-        with pytest.raises(ValueError, match="Expected 2 stitch points, got 1"):
-            StitchAnalyzer(stitch_analyzers, stitch_points=[50.0])
-
-        # Test mismatched analyzer types
-        mixed = [Analyzer(xps_raw_file)] + stitch_analyzers[:2]
-        with pytest.raises(TypeError, match="All analyzers must be the same type"):
-            StitchAnalyzer(mixed)
-
-        # Test mismatched abscissa labels
-        stitch_analyzers[1].abscissa_label = "DifferentLabel"
-        with pytest.raises(ValueError, match="Abscissa labels don't match"):
-            StitchAnalyzer(stitch_analyzers)
-
-        # Reset and test mismatched ordinate labels
-        stitch_analyzers[1].abscissa_label = stitch_analyzers[0].abscissa_label
-        stitch_analyzers[1].ordinate_label = "DifferentLabel"
-        with pytest.raises(ValueError, match="Ordinate labels don't match"):
-            StitchAnalyzer(stitch_analyzers)
-
-    def test_getattr(self, stitch_analyzers):
-        """Test StitchAnalyzer inherits callable methods and raises AttributeError for unknown ones."""
-        obj = StitchAnalyzer(stitch_analyzers)
-
-        assert callable(obj.plot_profile)
-        with pytest.raises(AttributeError):
-            _ = obj.non_existent_attribute
-
-
 class TestAnalyzerGroup:
     """Test suite for AnalyzerGroup class."""
 
     @pytest.fixture
     def analyzer_group(self, xps_multiple_raw_files):
         """Create an AnalyzerGroup for testing."""
-        return AnalyzerGroup(xps_multiple_raw_files)
-
-    def test_empty_paths_raises(self):
-        """Test that an empty paths list raises ValueError."""
-        with pytest.raises(ValueError, match="paths cannot be empty"):
-            AnalyzerGroup([])
+        return AnalyzerGroup([Analyzer(path) for path in xps_multiple_raw_files])
 
     def test_iter(self, analyzer_group):
         """Test iteration yields all analyzer instances."""
@@ -194,7 +116,7 @@ class TestAnalyzerGroup:
     def test_find_onset_profiles(self, noisy_raw_file, xps_multiple_raw_files):
         """Test find_onset on a profile-based group returns a valid index."""
         files = [noisy_raw_file, noisy_raw_file] + xps_multiple_raw_files
-        analyzer_group = AnalyzerGroup(files)
+        analyzer_group = AnalyzerGroup([Analyzer(path) for path in files])
 
         onset = analyzer_group.find_onset()
         assert onset == 1

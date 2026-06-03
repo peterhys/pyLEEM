@@ -6,7 +6,7 @@ def find_onset(profiles):
 
     The profiles can be full images or line profiles.
     Here we look at the "relative difference". The
-    np.gradient is not used beucase it tracks two steps at a time.
+    np.gradient is not used because it tracks two steps at a time.
 
     :param list profiles: List of profiles to find the onset of.
     :return: Index of the profile with the steepest rise.
@@ -48,7 +48,8 @@ def stitch_profiles(abscissas, profiles, mask_points):
 
     The abscissas and profile are assumed to be sorted.
     Currently, if the abscissa of a profile lands exactly on a mask point,
-    the point is included in the both profiles.
+    the point is included in the first profile and excluded from the second profile.
+    For the last profile, the last mask point is included.
 
     This can lead to an issue that at same x value, there
     are two different y values.
@@ -62,7 +63,10 @@ def stitch_profiles(abscissas, profiles, mask_points):
     masked_profiles = []
     masked_abscissas = []
     for i, (abscissa, profile) in enumerate(zip(abscissas, profiles)):
-        mask = (abscissa >= mask_points[i]) & (abscissa <= mask_points[i + 1])
+        if i == len(abscissas) - 1:
+            mask = (abscissa >= mask_points[i]) & (abscissa <= mask_points[i + 1])
+        else:
+            mask = (abscissa >= mask_points[i]) & (abscissa < mask_points[i + 1])
         masked_profiles.append(profile[mask])
         masked_abscissas.append(abscissa[mask])
 

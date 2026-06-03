@@ -52,7 +52,7 @@ def test_parse_standard_tags():
     # Tag without unit code
     data = b"\x03Start Voltage\x00" + struct.pack("<f", 25.3)
     leemdata = parse_leem_data(data)
-    assert np.isclose(leemdata["Start Voltage"][0], 25.3)
+    assert leemdata["Start Voltage"][0] == pytest.approx(25.3, rel=1e-5, abs=1e-8)
     assert leemdata["Start Voltage"][1] is None
 
     # Standard tag with special markers

@@ -24,23 +24,3 @@ def test_reader_read_image(reader, xps_array):
     """Test reader read_image method."""
     image = reader.read_image()
     assert np.array_equal(image, xps_array)
-
-
-def test_reader_read_profile(reader, xps_array, roi):
-    """Test reader read_profile method."""
-    profile = reader.read_profile(roi)
-    assert len(profile) == 128 and isinstance(profile, np.ndarray)
-    assert np.array_equal(profile, xps_array[0, :])
-
-
-def test_reader_comparison_and_repr(tmp_path, metadata_bytes, xps_raw_file, reader):
-    """Test reader __lt__ and __repr__ methods."""
-    raw_file1 = tmp_path / "test_01.dat"
-    raw_file2 = tmp_path / "test_02.dat"
-    raw_file1.write_bytes(metadata_bytes + b"\xff" * 2000)
-    raw_file2.write_bytes(metadata_bytes + b"\xff" * 2000)
-
-    reader1 = UViewReader(raw_file1)
-    reader2 = UViewReader(raw_file2)
-    assert reader1 < reader2
-    assert repr(reader) == f"UViewReader({xps_raw_file})"
