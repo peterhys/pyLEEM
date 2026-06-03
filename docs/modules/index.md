@@ -11,7 +11,7 @@ config
 metadata
 metainfo
 utils
-analysis
+analyzer
 stitch
 sees
 desp
