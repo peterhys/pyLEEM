@@ -109,6 +109,19 @@ def test_parse_special_tags():
     assert leemdata["Micrometers Y"][0] == pytest.approx(200.3)
 
 
+def test_parse_cp1252_metadata():
+    """Test metadat Windows cp1252/Latin-1 strings decoding."""
+    # FOV tag (0x6e) carrying a micro sign: b"10\xb5m" is "10um" in cp1252.
+    data = b"\x6e10\xb5m\x00" + struct.pack("<f", 7.5)
+    leemdata = parse_leem_data(data)
+    assert leemdata["FOV"][0] == b"10\xb5m".decode("cp1252")
+
+    # Gauge tag (0x6a) with a micro sign in the unit (e.g. "uA").
+    data = b"\x6aEmission\x00\xb5A\x00" + struct.pack("<f", 1.5)
+    leemdata = parse_leem_data(data)
+    assert leemdata["Emission"][1] == b"\xb5A".decode("cp1252")
+
+
 def test_parse_end_marker():
     """Test end marker and complex tag combinations."""
     # Test end marker
