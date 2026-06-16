@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add GitHub templates for issues and pull requests.
+- Add GitHub Actions workflow to publish distributions to PyPI on release.
+
 ### Fixed
 
 - Decode LEEM/UView metadata strings (FOV, image title, recipe) as Windows cp1252 
