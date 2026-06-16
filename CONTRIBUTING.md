@@ -111,6 +111,8 @@ Please report unacceptable behavior to the maintainer.
 
 By contributing to PyLEEM, you agree that your contributions
 will be licensed under the BSD 3-Clause License.
+Additional Brookhaven National Laboratory, U.S. Department of Energy, and U.S.
+Government rights notices are provided in [NOTICE](NOTICE).
 
 ---
 
