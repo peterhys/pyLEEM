@@ -37,7 +37,7 @@ def get_metadata(metabytes):
     # filetype
     filetypebytes = metabytes[:20]
     filetype = filetypebytes.split(b"\x00")[0]
-    metadata["filetype"] = (filetype.decode("utf-8"), None)
+    metadata["filetype"] = (filetype.decode("cp1252", errors="replace"), None)
 
     pos = 20
     for entry, format in FILE_CONTENTS:
@@ -49,7 +49,7 @@ def get_metadata(metabytes):
 
     if metadata["attachedRecipeSize"][0] > 0:
         recipe = metabytes[pos : pos + metadata["attachedRecipeSize"][0]]
-        metadata["recipe"] = (recipe.decode("utf-8"), None)
+        metadata["recipe"] = (recipe.decode("cp1252", errors="replace"), None)
         pos += metadata["attachedRecipeSize"]
     else:
         metadata["recipe"] = (None, None)
@@ -146,7 +146,7 @@ def parse_leem_data(data):
             # standard tags 0..99
 
             source, data = data.split(b"\x00", maxsplit=1)
-            source = source.decode("utf-8")
+            source = source.decode("cp1252", errors="replace")
             if data[:4] == b"sO\xc3G":
                 value = "invalid"
             elif data[:4] == b"\xf3O\xc3G":
@@ -169,8 +169,8 @@ def parse_leem_data(data):
             # additional gauge tags are 120 - 126 (the menu suggests 127 - 130
             # are also gauge tags but they are outside of the correct range)
             source, unit, data = data.split(b"\x00", maxsplit=2)
-            source = source.decode("utf-8")
-            unit = unit.decode("utf-8")
+            source = source.decode("cp1252", errors="replace")
+            unit = unit.decode("cp1252", errors="replace")
             value = struct.unpack(f"<f", data[:4])[0]
 
             leemdata[source] = (value, unit)
@@ -208,12 +208,12 @@ def parse_leem_data(data):
         elif is_tag_in_range(tag, (105, 105)):
             # image title
             title, data = data.split(b"\x00", maxsplit=1)
-            leemdata["Image Title"] = (title.decode("utf-8"), None)
+            leemdata["Image Title"] = (title.decode("cp1252", errors="replace"), None)
 
         elif is_tag_in_range(tag, (110, 110)):
             # FOV
             fov, data = data.split(b"\x00", maxsplit=1)
-            leemdata["FOV"] = (fov.decode("utf-8"), None)
+            leemdata["FOV"] = (fov.decode("cp1252", errors="replace"), None)
 
             cal_fov = struct.unpack(f"<f", data[:4])[0]
             leemdata["Cal. FOV"] = (cal_fov, None)

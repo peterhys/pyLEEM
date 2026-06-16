@@ -10,7 +10,15 @@ pyLEEM provides tools for reading LEEM files, performing XPS, SEES, and LEED ana
 ## Installation
 
 ```bash
-git clone https://github.com/peterhys/PyLEEM.git
+pip install pyleem
+```
+
+## Development installation
+
+Clone the development branch:
+
+```bash
+git clone --branch develop https://github.com/peterhys/PyLEEM.git
 cd PyLEEM
 pip install -e .
 ```
