@@ -32,7 +32,6 @@ assignees: ''
 
 ## Environment
 
-- **Where did the bug occur?**: [e.g., editable install, Python terminal/session, notebook]
 - **pyLEEM version**: [e.g., 0.2.0]
 - **Python version**: [e.g., 3.11.0]
 - **Operating System**: [e.g., macOS 26.0, Ubuntu 22.04, Windows 11]
