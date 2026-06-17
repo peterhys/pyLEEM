@@ -135,3 +135,5 @@ data/*
 *.DS_Store
 *.dat
 .vscode/*.json
+/joss/paper_files
+*.html
