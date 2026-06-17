@@ -137,3 +137,4 @@ data/*
 .vscode/*.json
 /joss/paper_files
 *.html
+*.pdf
