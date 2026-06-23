@@ -1,20 +1,65 @@
-from pyleem.metadata import get_metadata
-import numpy as np
 from abc import ABC, abstractmethod
+import matplotlib.pyplot as plt
+import numpy as np
+from pyleem.metadata import get_metadata_fixed_header
 
 
 class Reader(ABC):
-    """Abstract base class for LEEM data readers."""
+    """Abstract base class for LEEM data readers.
 
+    The reader should implement the get_image and get_metadata methods.
+    The property metadata and image are default and extract values at runtime.
+
+    The reader does not necessary need to parse a physical file path.'
+    However, the comparison operator __lt__ is required to be implemented
+    so that the reader is sortable.
+    """
+
+    @abstractmethod
+    def __lt__(self, other):
+        """Enable sorting reader objects."""
+        pass
+
+    @property
     @abstractmethod
     def metadata(self):
         """Return metadata as dictionary in (value, unit) format."""
         pass
 
+    @property
     @abstractmethod
-    def read_image(self):
-        """Read and return image data from file."""
+    def image(self):
+        """Return image data as numpy array."""
         pass
+
+    @property
+    def raw_metadata(self):
+        """Return the raw metadata.
+
+        The method is accessed by downstream operators.
+        """
+        return self.metadata
+
+    @property
+    def raw_image(self):
+        """Return the raw image.
+
+        The method is accessed by downstream operators.
+        """
+        return self.image
+
+    def plot_image(self, ax=None, **kwargs):
+        """Plot the raw image data.
+
+        :param matplotlib.axes.Axes ax: Matplotlib axes object.
+        """
+        ax = ax or plt.gca()
+        ax.imshow(self.image, **kwargs)
+        ax.set_xlabel("X (pixels)")
+        ax.set_ylabel("Y (pixels)")
+        ax.set_title("Raw Image Data")
+
+        return ax
 
 
 class UViewReader(Reader):
@@ -31,12 +76,11 @@ class UViewReader(Reader):
     def __init__(self, path):
         self.path = path
         self.metabytes = self.read_metabytes(self.METASIZE)
-        self._metadata = get_metadata(self.metabytes)
+        self._metadata = get_metadata_fixed_header(self.metabytes)
 
-    @property
-    def metadata(self):
-        """Return the parsed metadata dictionary."""
-        return self._metadata
+    def __lt__(self, other):
+        """Sorting by file path."""
+        return self.path < other.path
 
     def read_metabytes(self, metasize):
         """Read metadata bytes from file.
@@ -49,7 +93,8 @@ class UViewReader(Reader):
             metabytes = f.read(metasize)
         return metabytes
 
-    def read_image(self):
+    @property
+    def image(self):
         """Read the image data from file.
 
         Images are stored at the end of the file as 16-bit unsigned integers
@@ -66,3 +111,8 @@ class UViewReader(Reader):
             f.seek(-height * width * 2, 2)
             img = np.frombuffer(f.read(), dtype=dt).reshape(height, width)
         return img
+
+    @property
+    def metadata(self):
+        """Return metadata as dictionary in (value, unit) format."""
+        return self._metadata
