@@ -8,12 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Improve the repository architecture. Reader class now takes care of raw
-file interaction (image and metadata).
+Improve the repository architecture. Breaking changes included.
 
 ## Changed
 
 - Reader class now takes care of raw file interaction (image and metadata).
+- Analyzer class now takes care of domain specific analysis.
+- Analyzer class now includes the profile processing.
+- ROI inputs are now explicitly defined instead of an ROI object.
+
+## Added
+
+- ReaderGroup class that adds time interval to the metadata.
+- Analyzer workflow now more explicit for reproducibility.
+
 
 ## [0.2.1]
 
