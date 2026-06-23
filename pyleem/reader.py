@@ -21,32 +21,18 @@ class Reader(ABC):
         pass
 
     @property
-    @abstractmethod
     def metadata(self):
-        """Return metadata as dictionary in (value, unit) format."""
-        pass
+        """Return metadata as dictionary in (value, unit) format.
+
+        The method force the child class to posses the _metadata attribute.
+        """
+        return self._metadata
 
     @property
     @abstractmethod
     def image(self):
         """Return image data as numpy array."""
         pass
-
-    @property
-    def raw_metadata(self):
-        """Return the raw metadata.
-
-        The method is accessed by downstream operators.
-        """
-        return self.metadata
-
-    @property
-    def raw_image(self):
-        """Return the raw image.
-
-        The method is accessed by downstream operators.
-        """
-        return self.image
 
     def plot_image(self, ax=None, **kwargs):
         """Plot the raw image data.
@@ -60,6 +46,33 @@ class Reader(ABC):
         ax.set_title("Raw Image Data")
 
         return ax
+
+
+class ReaderGroup:
+    """Reader for a group of readers.
+
+    :param list paths: List of paths to LEEM data files. The path should be
+        sorted accordingly.
+    """
+
+    READER_CLS = NotImplementedError
+
+    def __init__(self, paths):
+
+        self.readers = [self.READER_CLS(path) for path in paths]
+        self.time_intervals = self.get_time_intervals()
+        for time_interval, reader in zip(self.time_intervals, self.readers):
+            reader._metadata.update({"TimeInterval": (time_interval, "s")})
+
+    def get_time_intervals(self):
+        """Calculate time intervals from the first acquisition.
+
+        :return: List of time intervals in seconds.
+        :rtype: list
+        """
+        timestamps = [reader.metadata["TimeStamp"][0] for reader in self.readers]
+        timedelta_list = np.cumsum(np.diff(timestamps, prepend=timestamps[0]))
+        return [timedelta.total_seconds() for timedelta in timedelta_list]
 
 
 class UViewReader(Reader):
@@ -112,7 +125,12 @@ class UViewReader(Reader):
             img = np.frombuffer(f.read(), dtype=dt).reshape(height, width)
         return img
 
-    @property
-    def metadata(self):
-        """Return metadata as dictionary in (value, unit) format."""
-        return self._metadata
+
+class UViewReaderGroup(ReaderGroup):
+    """Reader for a group of UView LEEM raw .dat files.
+
+    :param list paths: List of paths to LEEM data files. The path should be
+        sorted accordingly.
+    """
+
+    READER_CLS = UViewReader

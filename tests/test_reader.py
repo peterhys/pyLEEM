@@ -1,5 +1,5 @@
 import pytest
-from pyleem.reader import UViewReader
+from pyleem.reader import UViewReader, UViewReaderGroup
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -27,12 +27,6 @@ def test_reader_image(reader, xps_array):
     assert np.array_equal(image, xps_array)
 
 
-def test_reader_raw_accessors(reader, xps_array):
-    """Test reader raw accessors."""
-    assert reader.raw_metadata == reader.metadata
-    assert np.array_equal(reader.raw_image, xps_array)
-
-
 def test_reader_sort(tmp_path, metadata_bytes):
     """Test sorting readers by path."""
     file1 = tmp_path / "a_test.dat"
@@ -44,6 +38,21 @@ def test_reader_sort(tmp_path, metadata_bytes):
     reader1 = UViewReader(file1)
     reader2 = UViewReader(file2)
     assert reader1 < reader2
+
+
+def test_reader_group_time_intervals(xps_multiple_raw_files):
+    """Test reader group time intervals start at zero."""
+
+    reader_group = UViewReaderGroup(xps_multiple_raw_files)
+
+    assert len(reader_group.time_intervals) == 3
+    assert reader_group.time_intervals[0] == 0
+    assert reader_group.time_intervals[1] == 60
+    assert reader_group.time_intervals[2] == 120
+
+    assert reader_group.readers[0].metadata["TimeInterval"] == (0, "s")
+    assert reader_group.readers[1].metadata["TimeInterval"] == (60, "s")
+    assert reader_group.readers[2].metadata["TimeInterval"] == (120, "s")
 
 
 def test_reader_plot_image(reader):
