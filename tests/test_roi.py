@@ -4,6 +4,7 @@ from roifile import ImagejRoi, ROI_TYPE
 from pyleem.roi import (
     AreaROI,
     LineROI,
+    NoROI,
     OvalROI,
     PolygonROI,
     RectROI,
@@ -112,6 +113,26 @@ class TestLineROI:
         assert roi_object.stroke_width == 1.0
         assert roi_object.stroke_color == b"M\xff\xff\x00"
         assert roi_object.roitype == ROI_TYPE.LINE
+
+
+class TestNoROI:
+    """Test NoROI placeholder behavior."""
+
+    def test_measure_raises_not_implemented_error(self):
+        """Test NoROI.measure raises the intended error."""
+        roi = NoROI()
+
+        with pytest.raises(NotImplementedError, match="No ROI selected"):
+            roi.measure(np.ones((2, 2)))
+
+        with pytest.raises(NotImplementedError, match="No ROI selected"):
+            roi.profile(np.ones((2, 2)))
+
+        with pytest.raises(NotImplementedError, match="No ROI selected"):
+            roi.fromfile(ImagejRoi(roitype=ROI_TYPE.LINE))
+
+        with pytest.raises(NotImplementedError, match="No ROI selected"):
+            roi.tofile("no_roi.roi")
 
 
 class TestRectROI:

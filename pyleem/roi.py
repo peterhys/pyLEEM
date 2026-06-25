@@ -34,11 +34,18 @@ def measure_values(values, profile=None):
 
 
 @dataclass
-class ROIBase(ABC):
+class ROI(ABC):
     """Abstract base class for ImageJ-compatible regions of interest."""
 
     roi_file: str | None = field(default=None, repr=False)
     _required: tuple = field(default=(), init=False, repr=False)
+
+    REGISTRY = {}
+
+    def __init_subclass__(cls, **kwargs):
+        """Register the ROI class in the registry."""
+        super().__init_subclass__(**kwargs)
+        cls.REGISTRY[cls.__name__] = cls
 
     def __post_init__(self):
         """Post initialization hook to load ROI from file if provided.
@@ -80,7 +87,28 @@ class ROIBase(ABC):
 
 
 @dataclass
-class LineROI(ROIBase):
+class NoROI(ROI):
+    """NoROI placeholder for analyzer."""
+
+    def measure(self, image, **kwargs):
+        """Measure image intensity."""
+        raise NotImplementedError("No ROI selected")
+
+    def profile(self, image, **kwargs):
+        """Extract line profile from image."""
+        raise NotImplementedError("No ROI selected")
+
+    def fromfile(self, roi):
+        """Load ROI from roifile.ImagejRoi object."""
+        raise NotImplementedError("No ROI selected")
+
+    def tofile(self, filename):
+        """Save ROI to roifile.ImagejRoi file."""
+        raise NotImplementedError("No ROI selected")
+
+
+@dataclass
+class LineROI(ROI):
     """Line ROI for use with skimage.measure.profile_line.
 
     :ivar tuple src: Starting point (y, x) in image coordinates.
@@ -141,7 +169,7 @@ class LineROI(ROIBase):
 
 
 @dataclass
-class AreaROI(ROIBase):
+class AreaROI(ROI):
     """Base class for area regions of interest."""
 
     @abstractmethod
@@ -149,14 +177,14 @@ class AreaROI(ROIBase):
         """Return the selected pixels as a boolean mask."""
         pass
 
-    def profile(self, image):
+    def profile(self, image, **kwargs):
         """Return a profile for the area ROI, if available."""
         return None
 
-    def measure(self, image):
+    def measure(self, image, **kwargs):
         """Measure image intensity inside the ROI."""
         values = image[self.mask(image.shape)]
-        profile = self.profile(image)
+        profile = self.profile(image, **kwargs)
         return measure_values(values, profile=profile)
 
 
