@@ -1,7 +1,8 @@
-import pytest
-from pyleem.reader import UViewReader, UViewReaderGroup
 import numpy as np
 import matplotlib.pyplot as plt
+import pytest
+
+from pyleem.reader import UViewReader, read_files
 
 
 @pytest.fixture
@@ -40,19 +41,40 @@ def test_reader_sort(tmp_path, metadata_bytes):
     assert reader1 < reader2
 
 
-def test_reader_group_time_intervals(xps_multiple_raw_files):
-    """Test reader group time intervals start at zero."""
+def test_reader_update_metadata(reader):
+    """Test reader update_metadata method."""
+    reader.update_metadata({"Incident Voltage": (400.0, "eV")})
+    assert reader.metadata["Incident Voltage"] == (400.0, "eV")
 
-    reader_group = UViewReaderGroup(xps_multiple_raw_files)
 
-    assert len(reader_group.time_intervals) == 3
-    assert reader_group.time_intervals[0] == 0
-    assert reader_group.time_intervals[1] == 60
-    assert reader_group.time_intervals[2] == 120
+def test_read_files_time_intervals(xps_multiple_raw_files):
+    """Test read_files adds TimeInterval metadata."""
 
-    assert reader_group.readers[0].metadata["TimeInterval"] == (0, "s")
-    assert reader_group.readers[1].metadata["TimeInterval"] == (60, "s")
-    assert reader_group.readers[2].metadata["TimeInterval"] == (120, "s")
+    readers = read_files(xps_multiple_raw_files, UViewReader)
+
+    assert len(readers) == 3
+    assert readers[0].metadata["TimeInterval"] == (0.0, "s")
+    assert readers[1].metadata["TimeInterval"] == (60.0, "s")
+    assert readers[2].metadata["TimeInterval"] == (120.0, "s")
+
+
+def test_read_files_metadatas(xps_multiple_raw_files):
+    """Test read_files adds metadata."""
+
+    readers = read_files(
+        xps_multiple_raw_files,
+        UViewReader,
+        metadatas=[
+            {"Start Voltage": (2.0, "eV")},
+            {"Start Voltage": (4.0, "eV")},
+            {"Start Voltage": (6.0, "eV")},
+        ],
+    )
+
+    assert len(readers) == 3
+    assert readers[0].metadata["Start Voltage"] == (2.0, "eV")
+    assert readers[1].metadata["Start Voltage"] == (4.0, "eV")
+    assert readers[2].metadata["Start Voltage"] == (6.0, "eV")
 
 
 def test_reader_plot_image(reader):

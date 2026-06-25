@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import numpy as np
 from pyleem.metadata import get_metadata_fixed_header
+from pyleem.utils import get_time_intervals
 
 
 class Reader(ABC):
@@ -15,6 +16,13 @@ class Reader(ABC):
     so that the reader is sortable.
     """
 
+    REGISTRY = {}
+
+    def __init_subclass__(cls, **kwargs):
+        """Register the reader class in the registry."""
+        super().__init_subclass__(**kwargs)
+        cls.REGISTRY[cls.__name__] = cls
+
     @abstractmethod
     def __lt__(self, other):
         """Enable sorting reader objects."""
@@ -27,6 +35,10 @@ class Reader(ABC):
         The method force the child class to posses the _metadata attribute.
         """
         return self._metadata
+
+    def update_metadata(self, metadata):
+        """Update the metadata."""
+        self._metadata.update(metadata)
 
     @property
     @abstractmethod
@@ -48,48 +60,26 @@ class Reader(ABC):
         return ax
 
 
-class ReaderGroup:
-    """Reader for a group of readers.
-
-    :param list paths: List of paths to LEEM data files. The path should be
-        sorted accordingly.
-    """
-
-    READER_CLS = NotImplementedError
-
-    def __init__(self, paths):
-
-        self.readers = [self.READER_CLS(path) for path in paths]
-        self.time_intervals = self.get_time_intervals()
-        for time_interval, reader in zip(self.time_intervals, self.readers):
-            reader._metadata.update({"TimeInterval": (time_interval, "s")})
-
-    def get_time_intervals(self):
-        """Calculate time intervals from the first acquisition.
-
-        :return: List of time intervals in seconds.
-        :rtype: list
-        """
-        timestamps = [reader.metadata["TimeStamp"][0] for reader in self.readers]
-        timedelta_list = np.cumsum(np.diff(timestamps, prepend=timestamps[0]))
-        return [timedelta.total_seconds() for timedelta in timedelta_list]
-
-
 class UViewReader(Reader):
     """Reader for UView LEEM raw .dat files.
 
     UView .dat files contain a single image with combined file and image
     headers in a metadata block.
 
+    Additional metadata data can be added.
+
     :param str or Path path: Path to .dat file.
     """
 
     METASIZE = 16384
 
-    def __init__(self, path):
+    def __init__(self, path, metadata=None):
         self.path = path
         self.metabytes = self.read_metabytes(self.METASIZE)
         self._metadata = get_metadata_fixed_header(self.metabytes)
+
+        if metadata is not None:
+            self._metadata.update(metadata)
 
     def __lt__(self, other):
         """Sorting by file path."""
@@ -126,11 +116,19 @@ class UViewReader(Reader):
         return img
 
 
-class UViewReaderGroup(ReaderGroup):
-    """Reader for a group of UView LEEM raw .dat files.
+def read_files(paths, reader_cls=UViewReader, metadatas=None):
+    """Read a list of files and add time intervals metadata.
 
-    :param list paths: List of paths to LEEM data files. The path should be
-        sorted accordingly.
+    Additional metadatas can be added to the readers with the metadatas parameter.
+
+    TimeInterval metadata, however, is added directly.
     """
 
-    READER_CLS = UViewReader
+    metadatas = metadatas or [{}] * len(paths)
+
+    readers = [reader_cls(path) for path in paths]
+    time_intervals = get_time_intervals(readers)
+    for i, time_interval in enumerate(time_intervals):
+        readers[i].update_metadata({"TimeInterval": (time_interval, "s")})
+        readers[i].update_metadata(metadatas[i])
+    return readers
