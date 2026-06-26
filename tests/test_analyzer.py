@@ -52,6 +52,15 @@ def test_analyzer_onset(xps_readers):
     assert analyzer.readers == xps_readers[1:]
 
 
+def test_analyzer_indices(xps_readers):
+    """Test Analyzer indices match the active reader list."""
+    analyzer = Analyzer(xps_readers)
+    onset_analyzer = Analyzer(xps_readers, onset=1)
+
+    assert list(analyzer.indices) == [0, 1, 2]
+    assert list(onset_analyzer.indices) == [0, 1]
+
+
 def test_analyzer_onset_raises(xps_reader):
     """Test Analyzer onset raises if no readers after slicing."""
     with pytest.raises(ValueError, match="readers empty after onset"):

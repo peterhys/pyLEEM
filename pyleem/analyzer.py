@@ -38,6 +38,7 @@ class Analyzer:
         if not self.readers:
             raise ValueError("readers empty after onset")
         self.roi = roi or NoROI()
+        self.indices = range(len(self.readers))
 
     def get_image(self, index, kind="raw"):
         """Return the image."""
