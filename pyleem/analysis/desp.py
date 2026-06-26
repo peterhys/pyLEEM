@@ -217,7 +217,7 @@ class DESPCalibration(DESPAnalyzerBase):
 
         radii = []
         start_voltages = []
-        for index, reader in enumerate(self.readers):
+        for index in self.indices:
             _, _, r = get_radius(self.get_image(index, "processed"))
             radii.append(r)
             start_voltages.append(self.get_metadata("Start Voltage", index)[0])
@@ -258,7 +258,7 @@ class DESPAnalyzer(DESPAnalyzerBase):
         self.radii_array = []
         self.energy_array = []
 
-        for index, reader in enumerate(self.readers):
+        for index in self.indices:
             x, y, r = get_radius(self.get_image(index, "processed"))
             self.x_array.append(x)
             self.y_array.append(y)
