@@ -1,8 +1,9 @@
 from lmfit.models import PseudoVoigtModel
 import numpy as np
-from pyleem.analyzer import ProfileAnalyzer, AnalyzerGroup
+from pyleem.analyzer import Analyzer
+from pyleem.analysis.spectra import SpectraBase
 import scipy.signal
-from pyleem.config import Config
+import matplotlib.pyplot as plt
 
 
 def shirley_background(profile, base_diff, iterations=20, tol=1e-6):
@@ -170,97 +171,91 @@ def fit_xps(profile, abscissa, baseline, peak_labels, constraints):
     return result, bg
 
 
-def calibrate_xps(analyzers, cal_params, metadata=None):
-    """Calibrate pixel_per_eV and peak_shift using multiple spectra."""
-
-    baselines = cal_params["baselines"]
-    num_peaks = cal_params["num_peaks"]
-    incident_voltage = cal_params["incident_voltage"]
-    peak_prominence = cal_params.get("peak_prominence", 0.1)
-
-    pixel_per_ev = cal_params.get("pixel_per_ev", None)
-    peak_shift = cal_params.get("peak_shift", None)
-
-    bgs = []
-    results = []
-    peak_results = []
-
-    for i, analyzer in enumerate(analyzers):
-        constraints = parameter_contraint(analyzer.ordinate, num_peaks, peak_prominence)
-        peak_labels = [f"p{j}" for j in range(1, num_peaks + 1)]
-        result, bg = fit_xps(
-            analyzer.ordinate,
-            analyzer.pixel,
-            baselines[i],
-            peak_labels,
-            constraints,
-        )
-        peaks = [v for k, v in result.best_values.items() if "_center" in k]
-        results.append(result)
-        peak_results.append(peaks)
-        bgs.append(bg)
-
-    if metadata is not None:
-        start_voltages = np.array(metadata["Start Voltage"])
-    else:
-        start_voltages = np.array(
-            [analyzer.metadata["Start Voltage"][0] for analyzer in analyzers]
-        )
-    delta_ev = np.diff(start_voltages)
-
-    if "pixel_per_ev" in cal_params:
-        pixel_per_ev = cal_params["pixel_per_ev"]
-    else:
-        # Average over the peaks (the peak splitting should remain the same)
-        peak_diff = np.diff(peak_results, axis=0).mean(axis=1)
-        pixel_per_ev = np.mean(peak_diff / -delta_ev)
-
-    ref_index = cal_params.get("ref_index", None)
-    ref_value = cal_params.get("ref_value", None)
-
-    if "peak_shift" in cal_params:
-        peak_shift = cal_params["peak_shift"]
-    elif ref_index is None or ref_value is None:
-        # No reference peak adjustment
-        peak_shift = 0
-    else:
-        peak_pos = np.array(list(zip(*peak_results))[ref_index]) / pixel_per_ev
-        peak_shift = np.mean(incident_voltage - start_voltages - ref_value - peak_pos)
-
-    return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}
-
-
-class XPSConfig(Config):
+class XPSCalibration(Analyzer):
     """Config for XPS analyzer.
 
-    [calibration]
+    [reader]
     paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
+    metadata = [
+        {"Incident Voltage": [400, "eV"]},
+        {"Incident Voltage": [400, "eV"]},
+        {"Incident Voltage": [400, "eV"]}
+    ]
 
-    [calibration.parameters]
+    [task]
     baselines = [[197, 100], [197, 100], [197, 100]]
     num_peaks = 1
-    incident_voltage = 400
     # optional
     ref_index = 0
     ref_value = 285.0
     peak_prominence = 0.1
     """
 
-    def calibrate_results(self, cal_section):
-        """Calibrate pixel_per_eV and peak_shift using multiple spectra.
+    save_keys = ("pixel_per_ev", "peak_shift")
 
-        Supports calibration with two or more files by analyzing peak
-        positions across different accelerating voltages.
+    def analyze(
+        self,
+        num_peaks,
+        baselines,
+        peak_prominence=0.1,
+        pixel_per_ev=None,
+        peak_shift=None,
+        ref_index=None,
+        ref_value=None,
+    ):
+        """Analyze XPS spectrum with background subtraction.
+
+        :param int num_peaks: Number of peaks to fit.
+        :param tuple baseline: Tuple (left, right) background intensities.
+        :param float peak_prominence: Peak detection prominence.
+        :return: Fit result and Shirley background.
+        :rtype: tuple(lmfit.ModelResult, ndarray)
         """
-        roi = self.get_roi()
-        paths = self.get_paths(cal_section["paths"])
-        analyzers = [ProfileAnalyzer(path, roi) for path in paths]
-        cal_params = cal_section.get("parameters", {})
-        metadata = cal_section.get("metadata", None)
-        return calibrate_xps(analyzers, cal_params, metadata)
+
+        incident_voltage = np.array(
+            [self.get_metadata("Incident Voltage", index)[0] for index in self.indices]
+        )
+        start_voltages = np.array(
+            [self.get_metadata("Start Voltage", index)[0] for index in self.indices]
+        )
+        delta_ev = np.diff(start_voltages)
+
+        bgs = []
+        results = []
+        peak_results = []
+
+        for index in self.indices:
+            profile = self.get_profile(index)
+            pixel = self.get_pixel(index)
+            constraints = parameter_contraint(profile, num_peaks, peak_prominence)
+            peak_labels = [f"p{j}" for j in range(1, num_peaks + 1)]
+            result, bg = fit_xps(
+                profile, pixel, baselines[index], peak_labels, constraints
+            )
+            peaks = [v for k, v in result.best_values.items() if "_center" in k]
+            results.append(result)
+            peak_results.append(peaks)
+            bgs.append(bg)
+
+        if pixel_per_ev is None:
+            # Average over the peaks (the peak splitting should remain the same)
+            peak_diff = np.diff(peak_results, axis=0).mean(axis=1)
+            pixel_per_ev = np.mean(peak_diff / -delta_ev)
+
+        if peak_shift is None:
+            if ref_index is None or ref_value is None:
+                # No reference peak adjustment
+                peak_shift = 0
+            else:
+                peak_pos = np.array(list(zip(*peak_results))[ref_index]) / pixel_per_ev
+                peak_shift = np.mean(
+                    incident_voltage - start_voltages - ref_value - peak_pos
+                )
+
+        return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}
 
 
-class XPSAnalyzer(ProfileAnalyzer):
+class XPSAnalyzer(SpectraBase):
     """Analyzer for X-ray photoelectron spectroscopy data.
 
     Handles energy calibration and provides binding energy scales.
@@ -270,20 +265,16 @@ class XPSAnalyzer(ProfileAnalyzer):
     :param float incident_voltage: X-ray beam energy.
     """
 
-    def __init__(self, path, roi, pixel_per_ev, peak_shift, incident_voltage):
-
-        super().__init__(path, roi)
-
-        self.metadata["Incident Voltage"] = (incident_voltage, "eV")
-
-        self.KE = (
-            self.metadata["Start Voltage"][0] + peak_shift + self.pixel / pixel_per_ev
+    def __init__(self, readers, roi, pixel_per_ev, peak_shift, onset=0):
+        super().__init__(
+            readers,
+            roi=roi,
+            onset=onset,
+            pixel_per_ev=pixel_per_ev,
+            peak_shift=peak_shift,
         )
-        self.BE = incident_voltage - self.KE
 
-        self._abscissa, self._abscissa_label = self.BE, "Binding Energy [eV]"
-
-    def fit(self, num_peaks, baseline, peak_prominence=0.1):
+    def fit(self, index, num_peaks, baseline, peak_prominence=0.1):
         """Fit XPS spectrum with background subtraction.
 
         :param int num_peaks: Number of peaks to fit.
@@ -293,23 +284,29 @@ class XPSAnalyzer(ProfileAnalyzer):
         :rtype: tuple(lmfit.ModelResult, ndarray)
         """
 
-        constraints = parameter_contraint(self.ordinate, num_peaks, peak_prominence)
+        profile = self.get_profile(index)
+        BE = self.get_binding_energy(index)
+        constraints = parameter_contraint(profile, num_peaks, peak_prominence)
 
         # Convert peak positions from pixel space to binding energy space
         for i in range(1, num_peaks + 1):
             pixel_center = constraints[f"p{i}_center"]["value"]
             # Map pixel index to the corresponding x-axis value (binding energy)
-            constraints[f"p{i}_center"]["value"] = self.abscissa[int(pixel_center)]
+            constraints[f"p{i}_center"]["value"] = BE[int(pixel_center)]
 
         peak_labels = [f"p{i}" for i in range(1, num_peaks + 1)]
 
-        result, bg = fit_xps(
-            self.ordinate, self.abscissa, baseline, peak_labels, constraints
-        )
+        result, bg = fit_xps(profile, BE, baseline, peak_labels, constraints)
 
         return result, bg
 
-    def plot_fit(self, axes, result, background):
+    def get_binding_energy(self, index):
+        """Return the binding energy for a given index."""
+        kinetic_energy = self.get_kinetic_energy(index)
+        incident_voltage = self.get_metadata("Incident Voltage", index)[0]
+        return incident_voltage - kinetic_energy
+
+    def plot_profile(self, index, ax=None, show_fit=False, **kwargs):
         """Plot XPS fit results.
 
         :param tuple axes: Tuple of two axes (profile, residuals).
@@ -317,39 +314,30 @@ class XPSAnalyzer(ProfileAnalyzer):
         :param ndarray background: Shirley background array.
         """
 
-        ax_profile, ax_residual = axes
-        ax_profile.plot(self.abscissa, self.ordinate, label=f"{self.name} data")
-        ax_profile.plot(
-            self.abscissa, result.best_fit + background, label=f"{self.name} fit"
-        )
-        ax_profile.plot(self.abscissa, background, label=f"{self.name} background")
-        for prefix, fit_array in result.eval_components().items():
-            ax_profile.plot(
-                self.abscissa, fit_array + background, label=f"{self.name} {prefix} fit"
-            )
-        ax_profile.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-        ax_profile.set_ylabel(self.ordinate_label)
+        ax = ax or plt.gca()
 
-        ax_residual.set_ylabel("Residuals")
-        ax_residual.plot(self.abscissa, result.residual, label=f"{self.name} residuals")
-        ax_residual.set_xlabel(self.abscissa_label)
-        ax_residual.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+        profile = self.get_profile(index)
+        binding_energy = self.get_binding_energy(index)
 
+        ax.plot(binding_energy, profile, label="data")
+        ax.set_ylabel("Intensity")
+        ax.set_xlabel("Binding Energy [eV]")
 
-class XPSGroup(AnalyzerGroup):
-    """Batch analyzer for XPS spectra.
+        if show_fit:
 
-    :param list paths: List of paths to LEEM data files.
-    :param dict or LineROI roi: Region of interest for profile extraction.
-    :param float incident_voltage: X-ray photon energy in eV.
-    """
+            ax.figure.subplots_adjust(bottom=0.35)
+            ax_res = ax.inset_axes([0.0, -0.35, 1.0, 0.25])
 
-    def __init__(self, paths, roi, pixel_per_ev, peak_shift, incident_voltage):
-        assert len(paths) > 0, "Paths cannot be empty"
-        self.analyzers = [
-            XPSAnalyzer(path, roi, pixel_per_ev, peak_shift, incident_voltage)
-            for path in paths
-        ]
-        self.incident_voltage = incident_voltage
-        self.roi = roi
-        super().__init__(self.analyzers)
+            result, background = self.fit(index, **kwargs)
+            ax.plot(binding_energy, result.best_fit + background, label="fit")
+            ax.plot(binding_energy, background, label="background")
+            for prefix, fit_array in result.eval_components().items():
+                ax.plot(binding_energy, fit_array + background, label=f"{prefix} fit")
+            ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+            ax_res.set_ylabel("Residual Intensity")
+            ax_res.plot(binding_energy, result.residual, label="residual")
+            ax_res.set_xlabel("Binding Energy [eV]")
+            ax_res.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+        return ax

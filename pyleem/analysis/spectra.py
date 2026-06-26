@@ -2,7 +2,7 @@
 
 from pyleem.analyzer import Analyzer
 import numpy as np
-from pyleem.utils import find_stitch_points, stitch_profiles
+from pyleem.operation.stitich import find_stitch_points, stitch_profiles
 
 
 def kinetic_energy(pixel, start_voltage, pixel_per_ev, peak_shift):
@@ -10,11 +10,11 @@ def kinetic_energy(pixel, start_voltage, pixel_per_ev, peak_shift):
     return start_voltage + peak_shift + pixel / pixel_per_ev
 
 
-class SpectraAnalyzer(Analyzer):
+class SpectraBase(Analyzer):
     """Analyzer for spectra analysis."""
 
-    def __init__(self, readers, roi, pixel_per_ev, peak_shift):
-        super().__init__(readers, roi)
+    def __init__(self, readers, roi, pixel_per_ev, peak_shift, onset=0):
+        super().__init__(readers, roi=roi, onset=onset)
         self.pixel_per_ev = pixel_per_ev
         self.peak_shift = peak_shift
 
@@ -23,6 +23,17 @@ class SpectraAnalyzer(Analyzer):
         start_voltage = self.get_metadata("Start Voltage", index)[0]
         return kinetic_energy(pixel, start_voltage, self.pixel_per_ev, self.peak_shift)
 
-    def get_pixel(self, index):
-        """Return the pixel positions for a profile."""
-        return np.arange(len(self.get_profile(index)))
+    def stitch_profiles(self, indices, stitch_method="midpoint"):
+        """Stitch profiles together.
+
+        The indices needs to be in the order of stiching.
+        """
+        x_array_list = [self.get_kinetic_energy(index) for index in indices]
+        profile_list = [self.get_profile(index) for index in indices]
+
+        x_ranges = [(x[0], x[-1]) for x in x_array_list]
+        stitch_points = find_stitch_points(x_ranges, method=stitch_method)
+
+        mask_points = [x_ranges[0][0], *stitch_points, x_ranges[-1][1]]
+
+        return stitch_profiles(x_array_list, profile_list, mask_points)
