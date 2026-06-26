@@ -58,13 +58,13 @@ def test_read_files_time_intervals(xps_multiple_raw_files):
     assert readers[2].metadata["TimeInterval"] == (120.0, "s")
 
 
-def test_read_files_metadatas(xps_multiple_raw_files):
+def test_read_files_metadata_list(xps_multiple_raw_files):
     """Test read_files adds metadata."""
 
     readers = read_files(
         xps_multiple_raw_files,
         UViewReader,
-        metadatas=[
+        metadata_list=[
             {"Start Voltage": (2.0, "eV")},
             {"Start Voltage": (4.0, "eV")},
             {"Start Voltage": (6.0, "eV")},

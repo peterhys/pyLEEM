@@ -122,19 +122,20 @@ def get_time_intervals(readers):
     return [timedelta.total_seconds() for timedelta in timedelta_list]
 
 
-def read_files(paths, reader_cls=UViewReader, metadatas=None):
+def read_files(paths, reader_cls=UViewReader, metadata_list=None):
     """Read a list of files and add time intervals metadata.
 
-    Additional metadatas can be added to the readers with the metadatas parameter.
+    Additional metadatas can be added to the readers with the
+    metadata_list parameter.
 
     TimeInterval metadata, however, is added directly.
     """
 
-    metadatas = metadatas or [{}] * len(paths)
+    metadata_list = metadata_list or [{}] * len(paths)
 
     readers = [reader_cls(path) for path in paths]
     time_intervals = get_time_intervals(readers)
     for i, time_interval in enumerate(time_intervals):
         readers[i].update_metadata({"TimeInterval": (time_interval, "s")})
-        readers[i].update_metadata(metadatas[i])
+        readers[i].update_metadata(metadata_list[i])
     return readers

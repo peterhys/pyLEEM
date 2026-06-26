@@ -4,7 +4,7 @@ from pyleem.analyzer import Analyzer
 from pyleem.config import Config, load_config
 from pyleem.reader import UViewReader
 from pyleem.roi import LineROI
-from pyleem.workflow import Workflow, get_reader_paths, resolve_path
+from pyleem.workflow import Workflow, get_metadata_list, get_reader_paths, resolve_path
 
 
 @pytest.fixture
@@ -61,6 +61,8 @@ analyzer = "MockAnalyzer"
 
 [reader]
 paths = ["test_raw_0.dat", "test_raw_1.dat", "test_raw_2.dat"]
+metadata_list = [{fov = [10, "um"]}, {}, {}]
+metadata = {fov = [5, "um"]}
 
 [roi]
 roi_file = "test.roi"
@@ -135,6 +137,31 @@ def test_get_reader_paths_raises(tmp_path):
         get_reader_paths(config.reader, tmp_path)
 
 
+def test_get_metadata_list():
+    """Test get_metadata_list merges shared and per-reader metadata."""
+    metadata_list = get_metadata_list(
+        {
+            "metadata": {"fov": (5, "um"), "voltage": (400, "eV")},
+            "metadata_list": [
+                {"fov": (10, "um")},
+                {},
+                {"voltage": (402, "eV")},
+            ],
+        },
+        3,
+    )
+
+    assert metadata_list == [
+        {"fov": (10, "um"), "voltage": (400, "eV")},
+        {"fov": (5, "um"), "voltage": (400, "eV")},
+        {"fov": (5, "um"), "voltage": (402, "eV")},
+    ]
+
+    metadata_list[0]["extra"] = "value"
+    assert "extra" not in metadata_list[1]
+    assert "extra" not in metadata_list[2]
+
+
 def test_workflow_builds(tmp_path, xps_multiple_raw_files, roi_file, mock_analyzer):
     """Test Workflow builds readers, ROI, and analyzer from Config content."""
 
@@ -165,6 +192,9 @@ def test_workflow_builds_from_file(
     assert workflow.roi.src == (0, 0)
     assert workflow.roi.dst == (0, 127)
     assert workflow.analyzer.scale == 2
+    assert workflow.readers[0].metadata["fov"] == [10, "um"]
+    assert workflow.readers[1].metadata["fov"] == [5, "um"]
+    assert workflow.readers[2].metadata["fov"] == [5, "um"]
 
 
 def test_workflow_init_updates_config(tmp_path, xps_multiple_raw_files, roi_file):

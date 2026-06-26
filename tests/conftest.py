@@ -233,7 +233,7 @@ def xps_readers(xps_multiple_raw_files):
     return read_files(
         xps_multiple_raw_files,
         UViewReader,
-        metadatas=[
+        metadata_list=[
             {"Incident Voltage": (400, "eV")},
             {"Incident Voltage": (400, "eV")},
             {"Incident Voltage": (400, "eV")},
