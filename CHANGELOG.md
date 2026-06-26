@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Improve the repository architecture and simplify the API. Breaking changes included.
+Improve the repository architecture and simplify the API. Breaking changes included. See [design documentation](https://peterhys.github.io/pyLEEM/design.html) for details.
 
 ## Changed
 
@@ -18,13 +18,20 @@ Improve the repository architecture and simplify the API. Breaking changes inclu
 - ROI inputs are now explicitly defined instead of an ROI object.
 - Config class now takes care workflow configurations.
 - Updated domain specific analyzers. 
+- Update design documentation and add examples to README.md.
 
 ## Added
 
 - ReaderGroup class that adds time interval to the metadata.
 - Analyzer workflow now more explicit for reproducibility.
 - Workflow class now can read, run, and export the configuration file and content.
+- Add AreaROIs such as circle, rectangle, and ellipse.
 
+## Removed
+
+- Remove `AnalyzerGroup` class and associated domain specific analyzers.
+- Remove `StitchAnalyzer` class and moved stitich functionality to the
+  spectra analyzer.
 
 ## [0.2.1]
 
