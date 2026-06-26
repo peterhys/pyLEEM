@@ -214,7 +214,7 @@ class TestDESPCalibration:
 
     def test_save_keys(self):
         """Test calibration saves only parabola parameters."""
-        assert DESPCalibration.save_keys == ["parabola_params"]
+        assert DESPCalibration.save_keys == ("parabola_params",)
 
 
 class TestDESPAnalyzer:

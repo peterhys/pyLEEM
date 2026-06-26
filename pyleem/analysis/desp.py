@@ -197,7 +197,7 @@ class DESPAnalyzerBase(Analyzer):
 class DESPCalibration(DESPAnalyzerBase):
     """Calibration analyzer for DESP patterns."""
 
-    save_keys = ["parabola_params"]
+    save_keys = ("parabola_params",)
 
     def analyze(self, window):
         """Calibrate radius to potential using multiple images.
