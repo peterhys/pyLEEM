@@ -163,13 +163,14 @@ class DESPAnalyzerBase(Analyzer):
     def __init__(
         self,
         readers,
+        roi=None,
         onset=0,
         gaussian_kernel=3,
         gaussian_sigma=0,
         use_morph=True,
         morph_kernel=3,
     ):
-        super().__init__(readers, onset=onset, roi=None)
+        super().__init__(readers, roi=roi, onset=onset)
         self.gaussian_kernel = gaussian_kernel
         self.gaussian_sigma = gaussian_sigma
         self.use_morph = use_morph
@@ -246,9 +247,8 @@ class DESPAnalyzer(DESPAnalyzerBase):
     :ivar float energy: Electron energy if interpolation function provided.
     """
 
-    def __init__(self, readers, parabola_params):
-
-        super().__init__(readers)
+    def __init__(self, readers, parabola_params, roi=None, **parameters):
+        super().__init__(readers, roi=roi, **parameters)
 
         self.parabola_params = parabola_params
         self.convert_to_energy = self.get_energy_convert_function(parabola_params)
