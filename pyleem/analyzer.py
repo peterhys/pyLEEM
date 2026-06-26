@@ -64,19 +64,17 @@ class Analyzer:
             return self.get_raw_image(index)
         elif kind == "processed":
             return self.get_processed_image(index)
-        elif kind == "annotated":
-            return self.get_annotated_image(index)
         else:
             raise ValueError(f"Invalid image kind: {kind}")
 
     def annotate_image(self, index, ax):
-        """Annotate the image.
+        """Annotate the image for matplotlib plotting.
 
         Override to annotate the image.
         """
         return ax
 
-    def plot_image(self, index, ax=None, kind="processed"):
+    def plot_image(self, index, ax=None, kind="processed", annotate=False):
         """Plot image data.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
@@ -87,7 +85,7 @@ class Analyzer:
         image = self.get_image(index, kind=kind)
         ax.imshow(image)
 
-        if kind == "annotated":
+        if annotate:
             self.annotate_image(index, ax)
 
         ax.set_xlabel("X [pixels]")
@@ -124,15 +122,6 @@ class Analyzer:
         the processed image is not the same.
         """
         return self.get_raw_image(index)
-
-    def get_annotated_image(self, index):
-        """Return the annotated image.
-
-        The method should be overridden if
-        the annotated image is not the same.
-        Defaults to processed image.
-        """
-        raise NotImplementedError("'get_annotated_image' method is not implemented")
 
     def get_metadata(self, key, index):
         """Get metadata entries from all readers."""

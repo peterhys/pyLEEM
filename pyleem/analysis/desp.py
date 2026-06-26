@@ -272,13 +272,7 @@ class DESPAnalyzer(DESPAnalyzerBase):
         radius = self.radii_array[index]
         energy = self.energy_array[index]
 
-        circle = plt.Circle(
-            (x, y),
-            radius,
-            color="r",
-            fill=False,
-            linewidth=2,
-        )
+        circle = plt.Circle((x, y), radius, color="r", fill=False, linewidth=2)
         ax.add_patch(circle)
         ax.plot(x, y, "r+", markersize=5)
 
@@ -292,12 +286,7 @@ class DESPAnalyzer(DESPAnalyzerBase):
             va="top",
             color="white",
             fontsize=10,
-            bbox={
-                "facecolor": "black",
-                "alpha": 0.6,
-                "edgecolor": "none",
-                "pad": 4,
-            },
+            bbox={"facecolor": "black", "alpha": 0.6, "edgecolor": "none", "pad": 4},
         )
 
         return ax

@@ -100,12 +100,11 @@ def test_analyzer_onset_auto(raw_reader_factory):
 
 
 def test_analyzer_get_image(xps_reader, mock_analyzer):
-    """Test get_image dispatches raw, processed, and annotated images."""
+    """Test get_image dispatches raw and processed images."""
     analyzer = mock_analyzer([xps_reader])
 
     assert np.array_equal(analyzer.get_image(0, kind="raw"), xps_reader.image)
     assert np.array_equal(analyzer.get_image(0, kind="processed"), xps_reader.image + 1)
-    assert np.array_equal(analyzer.get_image(0, kind="annotated"), xps_reader.image + 2)
 
 
 def test_analyzer_get_image_raise(xps_reader, mock_analyzer):
@@ -121,10 +120,19 @@ def test_analyzer_plot_image(xps_reader, mock_analyzer):
     analyzer = mock_analyzer([xps_reader])
     fig, ax = plt.subplots()
 
-    analyzer.plot_image(0, ax=ax, kind="annotated")
+    # default, processed image
+    analyzer.plot_image(0, ax=ax)
 
     plotted = np.asarray(ax.images[0].get_array())
-    assert np.array_equal(plotted, xps_reader.image + 2)
+    assert np.array_equal(plotted, xps_reader.image + 1)
+    plt.close(fig)
+
+    # raw image
+    fig, ax = plt.subplots()
+    analyzer.plot_image(0, ax=ax, kind="raw")
+
+    plotted = np.asarray(ax.images[0].get_array())
+    assert np.array_equal(plotted, xps_reader.image)
     plt.close(fig)
 
 
@@ -133,7 +141,7 @@ def test_analyzer_plot_image_annotated(xps_reader, mock_analyzer):
     analyzer = mock_analyzer([xps_reader])
     fig, ax = plt.subplots()
 
-    returned = analyzer.plot_image(0, ax=ax, kind="annotated")
+    returned = analyzer.plot_image(0, ax=ax, annotate=True)
 
     assert returned is ax
     assert analyzer.annotation_indexes == [0]
@@ -196,11 +204,6 @@ def test_analyzer_unimplemented(xps_reader):
         NotImplementedError, match="'analyze' method is not implemented"
     ):
         analyzer.analyze()
-
-    with pytest.raises(
-        NotImplementedError, match="'get_annotated_image' method is not implemented"
-    ):
-        analyzer.get_annotated_image(0)
 
 
 def test_analyzer_subclasses_registry(mock_analyzer):
