@@ -73,6 +73,16 @@ class ROI(ABC):
             )
 
     @abstractmethod
+    def measure(self, image, **kwargs):
+        """Measure image properties."""
+        pass
+
+    @abstractmethod
+    def profile(self, image, **kwargs):
+        """Extract profile data from image."""
+        pass
+
+    @abstractmethod
     def fromfile(self, roi):
         """Load ROI from ImageJ file."""
         pass
@@ -200,11 +210,15 @@ class RectROI(AreaROI):
         default=("top", "left", "bottom", "right"), init=False, repr=False
     )
 
-    def __post_init__(self):
-        """Post initialization hook to calculate height and width."""
-        super().__post_init__()
-        self.height = self.bottom - self.top
-        self.width = self.right - self.left
+    @property
+    def height(self):
+        """Return the height of the ROI."""
+        return self.bottom - self.top
+
+    @property
+    def width(self):
+        """Return the width of the ROI."""
+        return self.right - self.left
 
     def fromfile(self, roi):
         """Load ROI from roifile.ImagejRoi object."""
@@ -256,11 +270,15 @@ class OvalROI(AreaROI):
         default=("top", "left", "bottom", "right"), init=False, repr=False
     )
 
-    def __post_init__(self):
-        """Post initialization hook to calculate height and width."""
-        super().__post_init__()
-        self.height = self.bottom - self.top
-        self.width = self.right - self.left
+    @property
+    def height(self):
+        """Return the height of the ROI."""
+        return self.bottom - self.top
+
+    @property
+    def width(self):
+        """Return the width of the ROI."""
+        return self.right - self.left
 
     def fromfile(self, roi):
         """Load ROI from roifile.ImagejRoi object."""
