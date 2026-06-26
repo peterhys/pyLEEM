@@ -326,3 +326,14 @@ def pixel_per_ev():
 def peak_shift():
     """Create a peak shift function."""
     return 0
+
+
+# Config content
+
+@pytest.fixture
+def config_file(tmp_path, config_content):
+    """Write config_content to a TOML file."""
+
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(config_content.strip(), encoding="utf-8")
+    return config_path

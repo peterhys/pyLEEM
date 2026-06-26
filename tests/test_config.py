@@ -3,15 +3,6 @@ import tomlkit
 
 from pyleem.config import Config, load_config, save_config
 
-
-def make_config(tmp_path, content):
-    """Write content into a TOML config file."""
-
-    config_path = tmp_path / "config.toml"
-    config_path.write_text(content, encoding="utf-8")
-    return config_path
-
-
 CONFIG_CONTENT = """
 [session]
 reader = "UViewReader"
@@ -42,13 +33,6 @@ def config_content():
     """Write a minimal TOML config file content."""
 
     return CONFIG_CONTENT.strip()
-
-
-@pytest.fixture
-def config_file(tmp_path, config_content):
-    """Write a minimal TOML config file and return its path."""
-
-    return make_config(tmp_path, config_content)
 
 
 def test_config_init():
