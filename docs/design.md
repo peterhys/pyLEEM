@@ -24,31 +24,26 @@ The `ROI` class is used to define the region of interest (ROI) for the analysis.
 ROI can either be manually defined or parsed from an ImageJ ROI file. Calibrated
 ROI stores calibration parameters for the region of interest. For LEEM, the pixel per eV
 and peak shift values are used to convert the pixel profile to the proper energy scale.
-Currently, only the line ROI is supported.
 
 ## Analyzer class
 
-The base unit of pyLEEM analysis is an `Analyzer` object, which converts a LEEM data file into
-a set of analyses through the `reader` instance. The basic `Analyzer` class provides simple
-analysis tools for raw data.
+The base unit of pyLEEM analysis is an `Analyzer` object.
+The basic `Analyzer` class provides simple analysis tools for raw data.
 
 For domain-specific analysis, `Analyzer` subclasses can be created. Currently, the
 available subclasses are:
 - `SEESAnalyzer`: Secondary Electron Energy Spectroscopy (SEES) analyzer.
 - `DESPAnalyzer`: Diffuse Elastic Scattering Pattern (DESP) analyzer.
 - `XPSAnalyzer`: X-ray Photoelectron Spectroscopy (XPS) analyzer.
-- `StitchAnalyzer`: Combines multiple overlapping spectra into a single continuous spectrum.
 
 These subclasses provide domain-specific analysis tools for the raw data.
 
-## AnalyzerGroup class
+## Workflow
 
-The `AnalyzerGroup` class is used to perform batch analysis on a set of LEEM data files.
-The input of the class is a list of raw files. The class takes care of
-the time stamp parsing and plotting. Domain specific analysis tools are provided by the
-subclasses.
+For reproducibility, workflow can be used to build readers, ROI, and analyzer
+objects, and define tasks. Workflow can be loaded and saved from
+configuration TOML files.
 
-The available subclasses are:
-- `SEESGroup`: Secondary Electron Energy Spectroscopy (SEES) group.
-- `DESPGroup`: Diffuse Elastic Scattering Pattern (DESP) group.
-- `XPSGroup`: X-ray Photoelectron Spectroscopy (XPS) group.
+Users can instantiate readers, ROI, and analyzers directly without Config or
+Workflow. Users use Workflow when they want standardized calibration,
+reproducible input, parameters, and streamlined I/O.
