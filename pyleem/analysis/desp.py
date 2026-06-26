@@ -1,8 +1,7 @@
-from pyleem.analyzer import Analyzer, AnalyzerGroup
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from pyleem.config import Config
+from pyleem.analyzer import Analyzer
 from lmfit import Model
 from functools import partial
 from scipy.signal import fftconvolve
@@ -86,37 +85,7 @@ def parabola_fit(voltages, radii, window=None):
 
     result = model.fit(voltages, params, x=radii)
 
-    fit_func = partial(model_func, **result.best_values)
-    return fit_func, result
-
-
-def calibrate_desp(analyzers, metadata=None, window=None):
-    """Calibrate radius to potential using multiple images.
-
-    Uses linear interpolation to map pattern radii to electron energies.
-    The disk detection defaults to contour detection.
-    The radius of the pattern is related to the square of the voltage.
-    The relationship is fitted to a parabola.
-
-    :param list analyzers: List of Analyzer objects.
-    :param dict metadata: Optional dictionary with a 'Start Voltage' key whose value
-        is a list of voltages. If None, the start voltage is read from each analyzer's metadata.
-    :param int window: Window size for the fit.
-    :return: Interpolation function mapping radius to potential (radius_to_energy_func).
-    :rtype: dict
-    """
-
-    radii = []
-    start_voltages = [] if metadata is None else metadata["Start Voltage"]
-    for analyzer in analyzers:
-        _, _, r = get_radius(preprocess_image(analyzer.image))
-        radii.append(r)
-        if metadata is None:
-            start_voltages.append(analyzer.metadata["Start Voltage"][0])
-
-    fit_function, fit_result = parabola_fit(start_voltages, radii, window=window)
-
-    return {"radius_to_energy_func": fit_function, "fit_result": fit_result}
+    return result
 
 
 def disk_kernel(radius):
@@ -188,28 +157,81 @@ def get_radius_convolve(
     return x, y, r
 
 
-class DESPConfig(Config):
-    """Config for DESP analyzer.
+class DESPAnalyzerBase(Analyzer):
+    """Base class for DESP analyzer."""
 
-    .. code-block:: toml
+    def __init__(
+        self,
+        readers,
+        onset=0,
+        gaussian_kernel=3,
+        gaussian_sigma=0,
+        use_morph=True,
+        morph_kernel=3,
+    ):
+        super().__init__(readers, onset=onset, roi=None)
+        self.gaussian_kernel = gaussian_kernel
+        self.gaussian_sigma = gaussian_sigma
+        self.use_morph = use_morph
+        self.morph_kernel = morph_kernel
 
-        [calibration]
-        # a directory containing the files
-        path_pattern = "Au_sample/*.dat"
-    """
+    def get_processed_image(self, index):
+        """Return the processed image."""
+        return preprocess_image(
+            self.get_raw_image(index),
+            gaussian_kernel=self.gaussian_kernel,
+            gaussian_sigma=self.gaussian_sigma,
+            use_morph=self.use_morph,
+            morph_kernel=self.morph_kernel,
+        )
 
-    def calibrate_results(self, cal_section):
-        """Calibrate radius to electron energy using multiple images."""
-        paths = sorted(self.get_patterned_paths(cal_section["path_pattern"]))
-        # assert len(paths) > 0, "No files found in the directory"
-        analyzers = [Analyzer(path) for path in paths]
-        metadata = cal_section.get("metadata", None)
-        window = cal_section.get("window", None)
+    def get_energy_convert_function(self, params):
+        """Return the energy conversion function."""
 
-        return calibrate_desp(analyzers, metadata, window)
+        def model_func(x, a, c):
+            return a * x**2 + c
+
+        return partial(model_func, **params)
 
 
-class DESPAnalyzer(Analyzer):
+class DESPCalibration(DESPAnalyzerBase):
+    """Calibration analyzer for DESP patterns."""
+
+    save_keys = ["parabola_params"]
+
+    def analyze(self, window):
+        """Calibrate radius to potential using multiple images.
+
+        Uses linear interpolation to map pattern radii to electron energies.
+        The disk detection defaults to contour detection.
+        The radius of the pattern is related to the square of the voltage.
+        The relationship is fitted to a parabola.
+
+        :param list analyzers: List of Analyzer objects.
+        :param dict metadata: Optional dictionary with a 'Start Voltage' key whose value
+            is a list of voltages. If None, the start voltage is read from each analyzer's metadata.
+        :param int window: Window size for the fit.
+        :return: Interpolation function mapping radius to potential (radius_to_energy_func).
+        :rtype: dict
+        """
+
+        radii = []
+        start_voltages = []
+        for index, reader in enumerate(self.readers):
+            _, _, r = get_radius(self.get_image(index, "processed"))
+            radii.append(r)
+            start_voltages.append(self.get_metadata("Start Voltage", index)[0])
+
+        fit_result = parabola_fit(start_voltages, radii, window=window)
+
+        return {
+            "parabola_params": dict(fit_result.best_values),
+            "fit_result": fit_result,
+            "radii": radii,
+        }
+
+
+class DESPAnalyzer(DESPAnalyzerBase):
     """Analyzer for amorphous DESP patterns.
 
     Analyzes DESP micrographs to detect circular diffraction patterns
@@ -224,57 +246,71 @@ class DESPAnalyzer(Analyzer):
     :ivar float energy: Electron energy if interpolation function provided.
     """
 
-    def __init__(self, path, radius_to_energy_func):
-        assert callable(
-            radius_to_energy_func
-        ), "radius_to_energy_func must be a callable"
-        super().__init__(path)
+    def __init__(self, readers, parabola_params):
 
-        self.x, self.y, self.radius = get_radius(self.processed_image)
+        super().__init__(readers)
 
-        self.energy = radius_to_energy_func(self.radius)
-        self.radius_to_energy_func = radius_to_energy_func
+        self.parabola_params = parabola_params
+        self.convert_to_energy = self.get_energy_convert_function(parabola_params)
 
-    @property
-    def processed_image(self):
-        """Return processed image (not stored due to size)."""
-        return preprocess_image(self.image)
+        self.x_array = []
+        self.y_array = []
+        self.radii_array = []
+        self.energy_array = []
 
-    def plot_radius(self, ax):
-        """Plot the detected circle on the DESP pattern.
+        for index, reader in enumerate(self.readers):
+            x, y, r = get_radius(self.get_image(index, "processed"))
+            self.x_array.append(x)
+            self.y_array.append(y)
+            self.radii_array.append(r)
+            self.energy_array.append(self.convert_to_energy(r))
 
-        :param matplotlib.axes.Axes ax: Matplotlib axes object.
-        """
-        ax.imshow(self.processed_image, cmap="gray")
+    def annotate_image(self, index, ax):
+        """Annotate DESP radius and energy on an image axes."""
+        x = self.x_array[index]
+        y = self.y_array[index]
+        radius = self.radii_array[index]
+        energy = self.energy_array[index]
+
         circle = plt.Circle(
-            (self.x, self.y), self.radius, color="r", fill=False, linewidth=2
+            (x, y),
+            radius,
+            color="r",
+            fill=False,
+            linewidth=2,
         )
         ax.add_patch(circle)
-        ax.plot(self.x, self.y, "r+", markersize=5)
+        ax.plot(x, y, "r+", markersize=5)
 
+        text = f"radius = {radius:.2f} px\nenergy = {energy:.2f} eV"
+        ax.text(
+            0.03,
+            0.97,
+            text,
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            color="white",
+            fontsize=10,
+            bbox={
+                "facecolor": "black",
+                "alpha": 0.6,
+                "edgecolor": "none",
+                "pad": 4,
+            },
+        )
 
-class DESPGroup(AnalyzerGroup):
-    """Batch analyzer for multiple amorphous DESP patterns.
+        return ax
 
-    Processes multiple DESP micrographs and calibrates radius-to-voltage
-    relationship using standard patterns with known voltages.
-
-    :param list paths: List of paths to DESP data files.
-    :param kwargs: Additional keyword arguments for AnalyzerGroup.
-    """
-
-    def __init__(self, paths, radius_to_energy_func):
-        assert len(paths) > 0, "Paths cannot be empty"
-
-        self.analyzers = [DESPAnalyzer(path, radius_to_energy_func) for path in paths]
-        self.radius_to_energy_func = radius_to_energy_func
-        super().__init__(self.analyzers)
-
-    def plot_energy(self, ax):
+    def plot_energy(self, ax=None):
         """Plot the energy vs. time.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
         """
-        ax.plot(self.time_intervals, self.get_attrs("energy"))
+        ax = ax or plt.gca()
+        time_intervals = [reader.metadata["TimeInterval"][0] for reader in self.readers]
+        ax.plot(time_intervals, self.energy_array)
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Electron Energy [eV]")
+
+        return ax
