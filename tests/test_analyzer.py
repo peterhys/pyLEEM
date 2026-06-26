@@ -1,43 +1,168 @@
+import matplotlib.pyplot as plt
+import numpy as np
 import pytest
-from pyleem.analyzer import Analyzer, AnalyzerGroup
+from pyleem.analyzer import Analyzer
 
 
-class TestAnalyzer:
-    """Test suite for Analyzer class."""
+@pytest.fixture
+def mock_analyzer():
 
-    def test_init(self, xps_raw_file):
-        """Test analyzer instantiation and basic properties."""
-        obj = Analyzer(xps_raw_file)
+    class AnnotatedAnalyzer(Analyzer):
+        """Analyzer subclass for testing processed images and overlays."""
 
-        assert obj.path == xps_raw_file
-        assert obj.name == "test"
-        assert obj.metadata == obj.reader.metadata
+        def __init__(self, *args, **kwargs):
+            self.annotation_indexes = []
+            super().__init__(*args, **kwargs)
+
+        def get_processed_image(self, index):
+            """Return a visibly processed image."""
+            return self.get_raw_image(index) + 1
+
+        def get_annotated_image(self, index):
+            """Return a visibly annotated image."""
+            return self.get_raw_image(index) + 2
+
+        def annotate_image(self, index, ax):
+            """Draw a simple overlay."""
+            self.annotation_indexes.append(index)
+            ax.axhline(0, color="red")
+            return ax
+
+    return AnnotatedAnalyzer
 
 
-class TestAnalyzerGroup:
-    """Test suite for AnalyzerGroup class."""
+def test_analyzer_readers(xps_readers):
+    """Test Analyzer stores the reader list."""
+    analyzer = Analyzer(xps_readers)
 
-    @pytest.fixture
-    def analyzer_group(self, xps_multiple_raw_files):
-        """Create an AnalyzerGroup for testing."""
-        return AnalyzerGroup([Analyzer(path) for path in xps_multiple_raw_files])
+    assert analyzer.readers == xps_readers
 
-    def test_iter(self, analyzer_group):
-        """Test iteration yields all analyzer instances."""
 
-        assert len(analyzer_group) == 3
+def test_analyzer_raises():
+    """Test Analyzer requires at least one reader."""
+    with pytest.raises(ValueError, match="readers cannot be empty"):
+        Analyzer([])
 
-    def test_getitem(self, analyzer_group):
-        """Test indexing returns the correct analyzer."""
-        assert analyzer_group[0] is analyzer_group.analyzers[0]
 
-    def test_get_metas(self, analyzer_group):
-        """Test get_metas returns a value for each file."""
-        voltages = analyzer_group.get_metadata_list("Start Voltage")
-        assert voltages == [114.0, 115.0, 116.0]
+def test_analyzer_onset(xps_readers):
+    """Test Analyzer onset slices readers."""
+    analyzer = Analyzer(xps_readers, onset=1)
 
-    def test_get_attrs(self, analyzer_group):
-        """Test get_attrs returns the named attribute from each analyzer."""
+    assert analyzer.onset == 1
+    assert analyzer.readers == xps_readers[1:]
 
-        names = analyzer_group.get_attribute_list("name")
-        assert names == [a.name for a in analyzer_group.analyzers]
+
+def test_analyzer_onset_raises(xps_reader):
+    """Test Analyzer onset raises if no readers after slicing."""
+    with pytest.raises(ValueError, match="readers empty after onset"):
+        Analyzer([xps_reader], onset=1)
+
+
+def test_analyzer_onset_auto(raw_reader_factory):
+    """Test Analyzer can derive onset from image intensity."""
+    images = [
+        np.ones((256, 128), dtype=np.uint16),
+        np.ones((256, 128), dtype=np.uint16) * 2,
+        np.ones((256, 128), dtype=np.uint16) * 20,
+    ]
+    readers = [
+        raw_reader_factory(f"onset_{index}.dat", image)
+        for index, image in enumerate(images)
+    ]
+
+    analyzer = Analyzer(readers, onset=None)
+
+    assert analyzer.onset == 1
+    assert analyzer.readers == readers[1:]
+
+
+def test_analyzer_get_image(xps_reader, mock_analyzer):
+    """Test get_image dispatches raw, processed, and annotated images."""
+    analyzer = mock_analyzer([xps_reader])
+
+    assert np.array_equal(analyzer.get_image(0, kind="raw"), xps_reader.image)
+    assert np.array_equal(analyzer.get_image(0, kind="processed"), xps_reader.image + 1)
+    assert np.array_equal(analyzer.get_image(0, kind="annotated"), xps_reader.image + 2)
+
+
+def test_analyzer_get_image_raise(xps_reader, mock_analyzer):
+    """Test get_image rejects unknown image kinds."""
+    analyzer = mock_analyzer([xps_reader])
+
+    with pytest.raises(ValueError, match="Invalid image kind"):
+        analyzer.get_image(0, kind="other")
+
+
+def test_analyzer_plot_image(xps_reader, mock_analyzer):
+    """Test plot_image draws the requested image kind."""
+    analyzer = mock_analyzer([xps_reader])
+    fig, ax = plt.subplots()
+
+    analyzer.plot_image(0, ax=ax, kind="annotated")
+
+    plotted = np.asarray(ax.images[0].get_array())
+    assert np.array_equal(plotted, xps_reader.image + 2)
+    plt.close(fig)
+
+
+def test_analyzer_plot_image_annotated(xps_reader, mock_analyzer):
+    """Test plot_image calls annotate_image for annotated images."""
+    analyzer = mock_analyzer([xps_reader])
+    fig, ax = plt.subplots()
+
+    returned = analyzer.plot_image(0, ax=ax, kind="annotated")
+
+    assert returned is ax
+    assert analyzer.annotation_indexes == [0]
+    assert len(ax.lines) == 1
+    plt.close(fig)
+
+
+def test_analyzer_get_measurement(xps_reader, roi, mock_analyzer):
+    """Test get_measurement measures the processed image by default."""
+    analyzer = mock_analyzer([xps_reader], roi=roi)
+
+    measurement = analyzer.get_measurement(0)
+    assert np.array_equal(measurement.profile, xps_reader.image[0, :] + 1)
+
+    measurement = analyzer.get_measurement(0, kind="raw")
+    assert np.array_equal(measurement.profile, xps_reader.image[0, :])
+
+
+def test_analyzer_get_profile(xps_reader, roi, mock_analyzer):
+    """Test get_profile returns the ROI measurement profile."""
+    analyzer = mock_analyzer([xps_reader], roi=roi)
+
+    profile = analyzer.get_profile(0)
+
+    assert np.array_equal(profile, xps_reader.image[0, :] + 1)
+
+
+def test_analyzer_get_metadata(xps_readers):
+    """Test get_metadata returns metadata values without units."""
+    analyzer = Analyzer(xps_readers)
+
+    assert analyzer.get_metadata("Start Voltage", 0) == (114.0, "V")
+    assert analyzer.get_metadata("Start Voltage", 1) == (115.0, "V")
+    assert analyzer.get_metadata("Start Voltage", 2) == (116.0, "V")
+
+
+def test_analyzer_unimplemented(xps_reader):
+    """Test base Analyzer raises if method is not implemented."""
+    analyzer = Analyzer([xps_reader])
+
+    with pytest.raises(
+        NotImplementedError, match="'analyze' method is not implemented"
+    ):
+        analyzer.analyze()
+
+    with pytest.raises(
+        NotImplementedError, match="'get_annotated_image' method is not implemented"
+    ):
+        analyzer.get_annotated_image(0)
+
+
+def test_analyzer_subclasses_registry(mock_analyzer):
+    """Test Analyzer subclasses are registered in the registry."""
+    assert Analyzer.REGISTRY["AnnotatedAnalyzer"] is mock_analyzer
+    assert Analyzer.REGISTRY["Analyzer"] is Analyzer
