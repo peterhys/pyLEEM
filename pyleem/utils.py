@@ -71,3 +71,10 @@ def stitch_profiles(abscissas, profiles, mask_points):
         masked_abscissas.append(abscissa[mask])
 
     return np.concatenate(masked_abscissas), np.concatenate(masked_profiles)
+
+
+def get_time_intervals(readers):
+    """Get the time intervals from the readers."""
+    timestamps = [reader.metadata["TimeStamp"][0] for reader in readers]
+    timedelta_list = np.cumsum(np.diff(timestamps, prepend=timestamps[0]))
+    return [timedelta.total_seconds() for timedelta in timedelta_list]

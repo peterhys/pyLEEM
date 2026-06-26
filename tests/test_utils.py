@@ -1,6 +1,11 @@
 import pytest
 import numpy as np
-from pyleem.utils import find_onset, find_stitch_points, stitch_profiles
+from pyleem.utils import (
+    find_onset,
+    find_stitch_points,
+    get_time_intervals,
+    stitch_profiles,
+)
 
 
 def test_find_onset():
@@ -15,6 +20,11 @@ def test_find_onset():
 
     onset_idx = find_onset(images)
     assert onset_idx == 4
+
+
+def test_get_time_intervals(xps_readers):
+    """Test get_time_intervals returns seconds from the first reader."""
+    assert get_time_intervals(xps_readers) == [0.0, 60.0, 120.0]
 
 
 def test_find_stitch_points():
