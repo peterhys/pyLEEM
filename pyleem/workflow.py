@@ -31,6 +31,8 @@ class Workflow:
     readers, roi, and allows additional kwargs.
 
     The workflow only runs the analyze method of the analyzer.
+    If the result contains content that are not pickleable, the analyzer should
+    specify the result keys to save.
     """
 
     def __init__(self, config=None, root=None, **kwargs):
@@ -75,10 +77,20 @@ class Workflow:
         task.update(parameters)
 
         result = self.analyzer.analyze(**task)
+        saved_result = self.get_saved_result(result)
 
-        self.config = self.config.with_changes(task=task, result=result)
+        self.config = self.config.with_changes(task=task, result=saved_result)
 
         return result
+
+    def get_saved_result(self, result):
+        """Return the result content that should be stored in Config."""
+        save_keys = getattr(self.analyzer, "save_keys", None)
+
+        if save_keys is None:
+            return result
+
+        return {key: result[key] for key in save_keys}
 
     def save(self, path):
         """Export the workflow to a configuration file."""

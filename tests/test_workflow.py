@@ -12,10 +12,13 @@ def mock_analyzer():
     class MockAnalyzer(Analyzer):
         """Test analyzer used by Workflow tests."""
 
+        save_keys = ("reader_count", "sigma")
+
         def __init__(self, readers, roi=None, onset=0, scale=1):
             super().__init__(readers=readers, roi=roi, onset=onset)
             self.scale = scale
             self.parameters = None
+            self.runtime_result = object()
 
         def analyze(self, **parameters):
             """Test analyze stores task parameters and returns a result."""
@@ -24,6 +27,7 @@ def mock_analyzer():
                 "reader_count": len(self.readers),
                 "scale": self.scale,
                 "sigma": parameters["sigma"],
+                "runtime_result": self.runtime_result,
             }
 
     return MockAnalyzer
@@ -194,12 +198,17 @@ def test_workflow_run_updates_config(tmp_path, xps_multiple_raw_files, roi_file)
 
     result = workflow.run(sigma=10)
 
-    assert result == {"reader_count": 3, "scale": 2, "sigma": 10}
+    assert result == {
+        "reader_count": 3,
+        "scale": 2,
+        "sigma": 10,
+        "runtime_result": workflow.analyzer.runtime_result,
+    }
     assert workflow.analyzer.parameters == {"sigma": 10, "background": "linear"}
     assert workflow.config is not original_config
     assert original_config.task == {"sigma": 8, "background": "linear"}
     assert workflow.config.task == {"sigma": 10, "background": "linear"}
-    assert workflow.config.result == result
+    assert workflow.config.result == {"reader_count": 3, "sigma": 10}
 
 
 def test_workflow_save(tmp_path, xps_multiple_raw_files, roi_file):
@@ -215,7 +224,7 @@ def test_workflow_save(tmp_path, xps_multiple_raw_files, roi_file):
     saved = load_config(output_path)
 
     assert saved.task == {"sigma": 10, "background": "linear"}
-    assert saved.result == {"reader_count": 3, "scale": 2, "sigma": 10}
+    assert saved.result == {"reader_count": 3, "sigma": 10}
 
 
 def test_workflow_builds_without_config(
@@ -249,9 +258,9 @@ def test_workflow_builds_without_config(
 
     workflow.run(sigma=10)
     assert workflow.config.task == {"sigma": 10, "background": "linear"}
-    assert workflow.config.result == {"reader_count": 3, "scale": 2, "sigma": 10}
+    assert workflow.config.result == {"reader_count": 3, "sigma": 10}
 
     workflow.save(tmp_path / "workflow_output.toml")
     saved = load_config(tmp_path / "workflow_output.toml")
     assert saved.task == {"sigma": 10, "background": "linear"}
-    assert saved.result == {"reader_count": 3, "scale": 2, "sigma": 10}
+    assert saved.result == {"reader_count": 3, "sigma": 10}
