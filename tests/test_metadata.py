@@ -1,6 +1,6 @@
 from pyleem.metadata import (
     convert_win_filetime,
-    get_metadata,
+    get_metadata_fixed_header,
     parse_leem_data,
     is_tag_in_range,
 )
@@ -16,9 +16,9 @@ def test_convert_win_filetime():
     assert convert_win_filetime(win_time) == "2025/01/01 05:20:00.000000"
 
 
-def test_get_metadata(metadata_bytes, header_parsed):
+def test_get_metadata_fixed_header(metadata_bytes, header_parsed):
     """Test metadata extraction from bytes."""
-    metadata = get_metadata(metadata_bytes)
+    metadata = get_metadata_fixed_header(metadata_bytes)
 
     for key in header_parsed.keys():
         assert metadata[key][0] == header_parsed[key]
@@ -168,7 +168,7 @@ def test_metadata_with_nan_values(header_bytes):
     img_header = b"\x02Test\x00" + struct.pack("<f", float("nan")) + b"\xff\xff"
 
     metadata_bytes = header_bytes + empty_1 + marker + empty_2 + img_header
-    metadata = get_metadata(metadata_bytes)
+    metadata = get_metadata_fixed_header(metadata_bytes)
 
     assert "Test" in metadata
     assert np.isnan(metadata["Test"][0])

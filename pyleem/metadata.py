@@ -24,7 +24,7 @@ def convert_win_filetime(timestamp):
     return dt.strftime("%Y/%m/%d %H:%M:%S.%f")
 
 
-def get_metadata(metabytes):
+def get_metadata_fixed_header(metabytes):
     """Extract and parse metadata from UView .dat file header.
 
     :param bytes metabytes: Raw metadata bytes from file header.
