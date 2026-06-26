@@ -201,22 +201,6 @@ def sees_reader(sees_raw_file):
 
 
 @pytest.fixture
-def desp_raw_file(tmp_path, metadata_bytes):
-    """Create a single DESP raw file with a circular pattern."""
-    image = np.zeros((256, 128), dtype=np.uint16)
-    cv2.circle(image, (64, 128), 40, 1000, -1)
-    desp_file = tmp_path / "test_desp.dat"
-    desp_file.write_bytes(metadata_bytes + b"\xff" * 2000 + image.tobytes())
-    return desp_file
-
-
-@pytest.fixture
-def desp_reader(desp_raw_file):
-    """Create a DESP reader."""
-    return UViewReader(desp_raw_file)
-
-
-@pytest.fixture
 def xps_multiple_raw_files(tmp_path, metadata_bytes):
     """Create multiple XPS raw files with different start voltages and timestamps."""
     files = []

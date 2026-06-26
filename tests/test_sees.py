@@ -14,12 +14,6 @@ def test_sees_onset(sees_array):
     assert onset_pos == pytest.approx(40.0, rel=1e-2)
 
 
-@pytest.fixture
-def sees_analyzer(sees_reader, roi, pixel_per_ev, peak_shift):
-    """Test create a SEESAnalyzer instance."""
-    return SEESAnalyzer([sees_reader], roi, pixel_per_ev, peak_shift, sigma=10)
-
-
 class TestSEESAnalyzer:
     """Test SEESAnalyzer class."""
 
