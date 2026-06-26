@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pytest
 
-from pyleem.reader import UViewReader, read_files
+from pyleem.reader import UViewReader, read_files, get_time_intervals
 
 
 @pytest.fixture
@@ -87,3 +87,8 @@ def test_reader_plot_image(reader):
     reader.plot_image(ax=None)
     assert len(plt.get_fignums()) == 1
     plt.close("all")
+
+
+def test_get_time_intervals(xps_readers):
+    """Test get_time_intervals returns seconds from the first reader."""
+    assert get_time_intervals(xps_readers) == [0.0, 60.0, 120.0]

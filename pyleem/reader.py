@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import numpy as np
 from pyleem.metadata import get_metadata_fixed_header
-from pyleem.utils import get_time_intervals
 
 
 class Reader(ABC):
@@ -114,6 +113,13 @@ class UViewReader(Reader):
             f.seek(-height * width * 2, 2)
             img = np.frombuffer(f.read(), dtype=dt).reshape(height, width)
         return img
+
+
+def get_time_intervals(readers):
+    """Get the time intervals from the readers."""
+    timestamps = [reader.metadata["TimeStamp"][0] for reader in readers]
+    timedelta_list = np.cumsum(np.diff(timestamps, prepend=timestamps[0]))
+    return [timedelta.total_seconds() for timedelta in timedelta_list]
 
 
 def read_files(paths, reader_cls=UViewReader, metadatas=None):

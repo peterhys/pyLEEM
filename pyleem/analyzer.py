@@ -1,6 +1,24 @@
 import matplotlib.pyplot as plt
-from pyleem.utils import find_onset
 from pyleem.roi import NoROI
+import numpy as np
+
+
+def find_onset(profiles):
+    """Find the onset of a profile.
+
+    The profiles can be full images or line profiles.
+    Here we look at the "relative difference". The
+    np.gradient is not used because it tracks two steps at a time.
+
+    :param list profiles: List of profiles to find the onset of.
+    :return: Index of the profile with the steepest rise.
+    :rtype: int
+    """
+
+    profile_sums = np.array([profile.sum() for profile in profiles], dtype=np.float64)
+    profile_diff = np.diff(profile_sums) / profile_sums[:-1]
+
+    return np.argmax(profile_diff)
 
 
 class Analyzer:
@@ -88,6 +106,13 @@ class Analyzer:
         """Extract the line profile from the image data."""
         return self.get_measurement(index, kind=kind).profile
 
+    def get_pixel(self, index):
+        """Return the pixel positions for a profile."""
+        profile = self.get_profile(index)
+        if profile is None:
+            raise ValueError("Profile is not available")
+        return np.arange(len(profile))
+
     def get_raw_image(self, index):
         """Return the raw image."""
         return self.readers[index].image
@@ -116,7 +141,13 @@ class Analyzer:
     def analyze(self, **kwargs):
         """Perform the analysis.
 
-        The method is required to be overridden by the subclass.
+        The method is not required if the analyzer does not need to
+        work with configuration and workflow logic.
+        The analyze method is recommended to be stack analysis
+        logic instead of acting on invidual readers.
+
+        For large data output, it is recommanded for analyze to save
+        the result to a file.
         """
         raise NotImplementedError("'analyze' method is not implemented")
 

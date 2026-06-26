@@ -1,7 +1,21 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
-from pyleem.analyzer import Analyzer
+from pyleem.analyzer import Analyzer, find_onset
+
+
+def test_find_onset():
+    """Test find_onset with 2D images.
+
+    Low noise frames followed by signal frames."""
+
+    shape = (20, 20)
+    images = np.zeros((10, *shape))
+    images[:5] = np.random.normal(0.1, 0.1, (5, *shape))
+    images[5:] = np.random.normal(0.1, 0.1, (5, *shape)) + 10  # added signal
+
+    onset_idx = find_onset(images)
+    assert onset_idx == 4
 
 
 @pytest.fixture
@@ -145,6 +159,24 @@ def test_analyzer_get_profile(xps_reader, roi, mock_analyzer):
     profile = analyzer.get_profile(0)
 
     assert np.array_equal(profile, xps_reader.image[0, :] + 1)
+
+
+def test_analyzer_get_pixel(xps_reader, roi, mock_analyzer):
+    """Test get_pixel returns profile pixel positions."""
+    analyzer = mock_analyzer([xps_reader], roi=roi)
+
+    pixel = analyzer.get_pixel(0)
+
+    assert np.array_equal(pixel, np.arange(128))
+
+
+def test_analyzer_get_pixel_raises(xps_reader, mock_analyzer):
+    """Test get_pixel raises when profile is not available."""
+    analyzer = mock_analyzer([xps_reader])
+    analyzer.get_profile = lambda index: None
+
+    with pytest.raises(ValueError, match="Profile is not available"):
+        analyzer.get_pixel(0)
 
 
 def test_analyzer_get_metadata(xps_readers):
