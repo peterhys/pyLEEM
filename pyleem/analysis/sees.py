@@ -28,10 +28,6 @@ class SEESBase(Analyzer):
         """Return the processed profile."""
         return gaussian_filter(self.get_profile(index), sigma=sigma)
 
-    def get_pixel(self, index):
-        """Return the pixel positions for a profile."""
-        return np.arange(len(self.get_profile(index)))
-
 
 class SEESCalibration(SEESBase):
     """Config for SEES analyzer."""
@@ -73,9 +69,6 @@ class SEESAnalyzer(SEESBase):
     :ivar float onset_pos: Extrapolated onset position in pixels.
     :ivar float surface_potential: Measured surface potential in V.
     """
-
-    x_label = "Energy [eV]"
-    y_label = "Intensity"
 
     def __init__(self, readers, roi, pixel_per_ev, peak_shift, onset=0, sigma=10):
         super().__init__(readers, roi=roi, onset=onset)
@@ -121,5 +114,9 @@ class SEESAnalyzer(SEESBase):
                 "--",
                 label="fit",
             )
-        ax.set_xlabel(self.x_label)
-        ax.set_ylabel(self.y_label)
+            ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+        ax.set_xlabel("Energy [eV]")
+        ax.set_ylabel("Intensity")
+
+        return ax
+

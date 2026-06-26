@@ -45,7 +45,6 @@ class TestSEESAnalyzer:
         assert result["kinetic_energy"] == pytest.approx(
             (pixel - result["onset_pos"]) / pixel_per_ev
         )
-        assert sees_analyzer.x_label == "Energy [eV]"
 
     def test_sees_onset(self, sees_analyzer):
         """Test SEES_onset with ramp profile."""
