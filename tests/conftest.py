@@ -160,7 +160,9 @@ def xps_raw_file(tmp_path, metadata_bytes, xps_array):
 @pytest.fixture
 def xps_reader(xps_raw_file):
     """Create an XPS reader."""
-    return UViewReader(xps_raw_file)
+    reader = UViewReader(xps_raw_file)
+    reader.update_metadata({"Incident Voltage": (400, "eV")})
+    return reader
 
 
 @pytest.fixture
@@ -244,7 +246,15 @@ def xps_multiple_raw_files(tmp_path, metadata_bytes):
 @pytest.fixture
 def xps_readers(xps_multiple_raw_files):
     """Create XPS readers from multiple raw files."""
-    return read_files(xps_multiple_raw_files, UViewReader)
+    return read_files(
+        xps_multiple_raw_files,
+        UViewReader,
+        metadatas=[
+            {"Incident Voltage": (400, "eV")},
+            {"Incident Voltage": (400, "eV")},
+            {"Incident Voltage": (400, "eV")},
+        ],
+    )
 
 
 @pytest.fixture
@@ -329,6 +339,7 @@ def peak_shift():
 
 
 # Config content
+
 
 @pytest.fixture
 def config_file(tmp_path, config_content):
