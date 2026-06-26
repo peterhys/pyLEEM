@@ -94,14 +94,14 @@ class SEESAnalyzer(SEESBase):
             "slope": slope,
         }
 
-    def plot_profile(self, ax=None, show_fit=False, index=0):
+    def plot_profile(self, index, ax=None, show_fit=False):
         """Plot profile with optional onset fit overlay.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
         :param bool show_fit: Whether to show onset fit line.
         """
 
-        result = self.analyze_profile(index, self.sigma)
+        result = self.analyze_profile(index)
         profile = self.get_profile(index)
 
         ax = ax or plt.gca()
@@ -119,4 +119,3 @@ class SEESAnalyzer(SEESBase):
         ax.set_ylabel("Intensity")
 
         return ax
-
