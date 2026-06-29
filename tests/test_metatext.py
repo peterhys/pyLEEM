@@ -56,7 +56,7 @@ def test_overlay_text_mixin(xps_reader):
 
         def annotate_image(self, index, ax):
             ax = super().annotate_image(index, ax)
-            return self.add_metadata_text(index, ax)
+            return self.annotate_metadata(index, ax)
 
     analyzer = MetadataOverlay([xps_reader])
     fig, ax = plt.subplots()

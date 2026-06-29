@@ -65,7 +65,7 @@ class MetadataTextMixin:
     """Mixin that adds selected metadata text to Analyzer image plots.
 
     Inherit from this mixin before the analyzer class, then call
-    add_metadata_text from the subclass annotate_image method.
+    annotate_metadata from the subclass annotate_image method.
 
     Example:
         class MetadataXPSAnalyzer(MetadataTextMixin, XPSAnalyzer):
@@ -74,7 +74,7 @@ class MetadataTextMixin:
 
             def annotate_image(self, index, ax):
                 ax = super().annotate_image(index, ax)
-                return self.add_metadata_text(index, ax)
+                return self.annotate_metadata(index, ax)
     """
 
     metadata_labels = DEFAULT_METADATA_LABELS
@@ -86,7 +86,7 @@ class MetadataTextMixin:
         lines = format_lines(metadata, labels)
         return "\n".join(lines)
 
-    def add_metadata_text(
+    def annotate_metadata(
         self,
         index,
         ax,

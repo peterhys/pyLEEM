@@ -39,7 +39,7 @@ def test_scalebar_metadata():
 
         def annotate_image(self, index, ax):
             ax = super().annotate_image(index, ax)
-            return self.add_scalebar(
+            return self.annotate_scalebar(
                 index,
                 ax,
                 target_um=5,
@@ -76,7 +76,7 @@ def test_scalebar_bar_width():
 
         def annotate_image(self, index, ax):
             ax = super().annotate_image(index, ax)
-            return self.add_scalebar(index, ax, target_um=5, bar_width=120)
+            return self.annotate_scalebar(index, ax, target_um=5, bar_width=120)
 
     analyzer = ScaleBarAnalyzer([reader])
     fig, ax = plt.subplots()

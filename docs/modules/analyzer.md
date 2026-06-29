@@ -45,7 +45,7 @@ class VoltageProfileAnalyzer(MetadataTextMixin, Analyzer):
     def annotate_image(self, index, ax):
         """Label the image with the voltage."""
         voltage, unit = self.get_metadata("Voltage", index)
-        return self.add_metadata_text(index, ax, labels=["Voltage"])
+        return self.annotate_metadata(index, ax, labels=["Voltage"])
 
     def analyze(self):
         """Analyze the total image intensity vs the voltage."""

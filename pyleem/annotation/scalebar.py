@@ -11,14 +11,14 @@ class ScaleBarMixin:
     """Annotation class that adds a FOV-calibrated scale bar.
 
     Inherit from this class before the analyzer class, then call
-    add_scalebar from the subclass annotate_image method.
+    annotate_scalebar from the subclass annotate_image method.
 
     Example:
         class ScaleBarAnalyzer(ScaleBarMixin, Analyzer):
 
             def annotate_image(self, index, ax):
                 ax = super().annotate_image(index, ax)
-                return self.add_scalebar(index, ax, target_um=5)
+                return self.annotate_scalebar(index, ax, target_um=5)
     """
 
     def get_scalebar_parameter(self, index):
@@ -29,7 +29,7 @@ class ScaleBarMixin:
         image_width = self.get_metadata("ImageWidth", index)[0]
         return fov_um, image_height, image_width
 
-    def add_scalebar(
+    def annotate_scalebar(
         self,
         index,
         ax,
