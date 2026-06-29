@@ -1,5 +1,5 @@
 import pytest
-from pyleem.operation.stitich import find_stitch_points, stitch_profiles
+from pyleem.operation.stitch import find_stitch_points, stitch_profiles
 import numpy as np
 
 

@@ -30,7 +30,7 @@ Improve the repository architecture and simplify the API. Breaking changes inclu
 ## Removed
 
 - Remove `AnalyzerGroup` class and associated domain specific analyzers.
-- Remove `StitchAnalyzer` class and moved stitich functionality to the
+- Remove `StitchAnalyzer` class and moved stitch functionality to the
   spectra analyzer.
 
 ## [0.2.1]

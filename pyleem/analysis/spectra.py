@@ -2,7 +2,7 @@
 
 from pyleem.analyzer import Analyzer
 import numpy as np
-from pyleem.operation.stitich import find_stitch_points, stitch_profiles
+from pyleem.operation.stitch import find_stitch_points, stitch_profiles
 
 
 def kinetic_energy(pixel, start_voltage, pixel_per_ev, peak_shift):
