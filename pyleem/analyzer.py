@@ -70,7 +70,9 @@ class Analyzer:
     def annotate_image(self, index, ax):
         """Annotate the image for matplotlib plotting.
 
-        Override to annotate the image.
+        Override to annotate the image. Currently, the annotate_image method
+        does not take additional arguments. The idea is that the whole image
+        stack should be annotated the same way.
         """
         return ax
 
