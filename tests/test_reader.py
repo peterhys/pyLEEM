@@ -84,9 +84,12 @@ def test_reader_plot_image(reader):
     assert len(ax.images) == 1
     plt.close(fig)
 
-    reader.plot_image(ax=None)
-    assert len(plt.get_fignums()) == 1
-    plt.close("all")
+    ax = reader.plot_image(ax=None)
+
+    assert len(ax.images) == 1
+    assert ax.get_xlabel() == "X [pixels]"
+    assert ax.get_ylabel() == "Y [pixels]"
+    assert ax.get_title() == "Raw Image Data"
 
 
 def test_get_time_intervals(xps_readers):

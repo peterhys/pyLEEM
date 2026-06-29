@@ -2,8 +2,16 @@ import pytest
 import struct
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 from pyleem.reader import UViewReader, read_files
 from pyleem.roi import LineROI
+
+
+@pytest.fixture(autouse=True)
+def close_matplotlib_figures():
+    """Close matplotlib figures after every test."""
+    yield
+    plt.close("all")
 
 
 def set_start_voltage(metadata_bytes, voltage):

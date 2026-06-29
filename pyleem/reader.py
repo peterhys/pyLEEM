@@ -52,8 +52,8 @@ class Reader(ABC):
         """
         ax = ax or plt.gca()
         ax.imshow(self.image, **kwargs)
-        ax.set_xlabel("X (pixels)")
-        ax.set_ylabel("Y (pixels)")
+        ax.set_xlabel("X [pixels]")
+        ax.set_ylabel("Y [pixels]")
         ax.set_title("Raw Image Data")
 
         return ax
