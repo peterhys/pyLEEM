@@ -26,6 +26,7 @@ Improve the repository architecture and simplify the API. Breaking changes inclu
 - Analyzer workflow now more explicit for reproducibility.
 - Workflow class now can read, run, and export the configuration file and content.
 - Add AreaROIs such as circle, rectangle, and ellipse.
+- Add XASAnalyzer for X-ray absorption image stack analysis.
 
 ## Removed
 
