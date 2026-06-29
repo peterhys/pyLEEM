@@ -1,7 +1,7 @@
 """Metadata text annotation for image analyzers."""
 
 DEFAULT_METADATA_LABELS = {
-    "FOV": ("FOV", ".2f", None),
+    "FOV": ("FOV", None, None),
     "MCH": ("Main Chamber Pressure", ".2e", None),
     "Sample Temp.": ("Sample Temperature", ".1f", "deg C"),
     "Objective": ("Objective", ".1f", None),
@@ -23,7 +23,7 @@ def format_value(value, value_format=None):
 
 
 def format_unit(metadata_unit, unit_name):
-    """Return the unit text for an metadata field."""
+    """Return the unit text for a metadata field."""
     if unit_name is None:
         return metadata_unit or ""
 

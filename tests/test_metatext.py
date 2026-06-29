@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from pyleem.analyzer import Analyzer
 from pyleem.annotation.metatext import (
+    DEFAULT_METADATA_LABELS,
     MetadataTextMixin,
     format_lines,
 )
@@ -15,7 +16,7 @@ class MetadataReader:
 
 
 def test_format_str_lines():
-    """Test overlay labels control display name, value format, and unit."""
+    """Test metadata labels control display name, value format, and unit."""
     metadata = {
         "FOV": (50, "um"),
         "MCH": (2.4e-9, "Torr"),
@@ -23,7 +24,7 @@ def test_format_str_lines():
         "Objective": (1600, "mA"),
         "Start Voltage": (20, "eV"),
     }
-    overlay_labels = {
+    metadata_labels = {
         "FOV": ("FOV", ".1f", None),
         "MCH": ("Pressure", ".2e", None),
         "Sample Temp.": ("Temperature", ".1f", "deg C"),
@@ -31,7 +32,7 @@ def test_format_str_lines():
         "Start Voltage": ("Start Voltage", ".2f", "eV"),
     }
 
-    lines = format_lines(metadata, overlay_labels)
+    lines = format_lines(metadata, metadata_labels)
 
     assert lines == [
         "FOV: 50.0 um",
@@ -43,7 +44,7 @@ def test_format_str_lines():
 
 
 def test_overlay_text_mixin(xps_reader):
-    """Test OverlayTextMixin leaves annotate_image composition to subclasses."""
+    """Test MetadataTextMixin leaves annotate_image composition to subclasses."""
 
     class MetadataOverlay(MetadataTextMixin, Analyzer):
         """Analyzer with metadata text overlay."""
