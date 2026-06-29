@@ -1,48 +1,44 @@
-# `pyleem.analysis.stitch`
+# `pyleem.operation.stitch`
 
-Profile stitching for combining multiple overlapping spectra into a single
-continuous spectrum.
+Profile stitching utilities for combining multiple overlapping spectra into a
+single continuous profile.
 
-{py:class}`~pyleem.analysis.stitch.StitchAnalyzer` is a subclass of
-{py:class}`~pyleem.analyzer.ProfileAnalyzer` that combines a list of same-type
-analyzers with overlapping abscissa ranges into one continuous profile. The
-analyzers are sorted by their minimum abscissa value. The stitch points are either
-supplied explicitly or auto-computed via {py:func}`~pyleem.utils.find_stitch_points`
-using a `stitch_method` (`'midpoint'`, `'start'`, or `'end'`). Because it has no
-file, `image` and `reader` are unavailable; metadata can be passed directly to
-the constructor.
+The current implementation exposes two functions:
+
+| Function | Purpose |
+|---|---|
+| {py:func}`~pyleem.operation.stitch.find_stitch_points` | Computes cut values between neighboring x ranges using `"midpoint"`, `"start"`, or `"end"` strategy. |
+| {py:func}`~pyleem.operation.stitch.stitch_profiles` | Applies mask boundaries to x/y profile arrays and concatenates the selected segments. |
+
+These helpers are used by {py:meth}`pyleem.analysis.spectra.SpectraBase.stitch_profiles`
+to combine spectra from overlapping acquisition ranges.
 
 ## Example
 
 ```python
-from pyleem.analysis.xps import XPSAnalyzer
-from pyleem.analysis.stitch import StitchAnalyzer
-from pyleem.roi import LineROI
-import matplotlib.pyplot as plt
+import numpy as np
 
-roi = LineROI(src=(256, 0), dst=(256, 511), linewidth=10)
+from pyleem.operation.stitch import find_stitch_points, stitch_profiles
 
-# Three XPS scans with overlapping energy ranges
-analyzers = [
-    XPSAnalyzer(path, roi, pixel_per_ev, peak_shift, incident_voltage=400)
-    for path in ["data_280eV.dat", "data_284eV.dat", "data_288eV.dat"]
+x_arrays = [
+    np.array([0, 1, 2, 3, 4]),
+    np.array([3, 4, 5, 6, 7]),
+    np.array([6, 7, 8, 9, 10]),
+]
+y_arrays = [
+    np.array([10, 20, 30, 40, 50]),
+    np.array([60, 70, 80, 90, 100]),
+    np.array([110, 120, 130, 140, 150]),
 ]
 
-# Generate the stitch analyzer
-stitch_analyzer = StitchAnalyzer(analyzers, stitch_method="midpoint")
+x_ranges = [(x[0], x[-1]) for x in x_arrays]
+stitch_points = find_stitch_points(x_ranges, method="midpoint")
+mask_points = [x_ranges[0][0], *stitch_points, x_ranges[-1][1]]
 
-print(stitch_analyzer.stitch_points)
-print(stitch_analyzer.abscissa_label) # Binding Energy [eV]
-
-# Provide explicit stitch points instead
-# And provide metadata
-stitch_analyzer = StitchAnalyzer(
-    analyzers, stitch_points=[195.0, 197.5], metadata={"Incident Voltage": (400, "eV")}
-)
+stitched_x, stitched_y = stitch_profiles(x_arrays, y_arrays, mask_points)
 ```
 
 ```{eval-rst}
-.. automodule:: pyleem.analysis.stitch
+.. automodule:: pyleem.operation.stitch
    :members:
-   :show-inheritance:
 ```
