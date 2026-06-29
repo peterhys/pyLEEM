@@ -1,34 +1,34 @@
 """Configuration snapshots for workflow analysis runs.
 
-The file is structured as follows:
+The file is structured as follows.
 
-```toml
-[session]
-version = "0.1.0"
-reader = "UViewReader"
-roi = "LineROI"
-analyzer = "XPSAnalyzer"
+.. code-block:: toml
 
-[reader]
-paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
+    [session]
+    version = "0.3.0"
+    reader = "UViewReader"
+    roi = "LineROI"
+    analyzer = "XPSAnalyzer"
 
-[roi]
-roi_file = "line.roi"
+    [reader]
+    paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
 
-[analyzer]
-onset = 0
+    [roi]
+    roi_file = "line.roi"
 
-[task]
-num_peaks = 1
-baselines = [[197, 100], [197, 100], [197, 100]]
-ref_index = 0
-ref_value = 285.0
-incident_voltage = 400
+    [analyzer]
+    onset = 0
 
-[result]
-pixel_per_ev = 166.0
-peak_shift = 3.75
-```
+    [task]
+    num_peaks = 1
+    baselines = [[197, 100], [197, 100], [197, 100]]
+    ref_index = 0
+    ref_value = 285.0
+    incident_voltage = 400
+
+    [result]
+    pixel_per_ev = 166.0
+    peak_shift = 3.75
 """
 
 from copy import deepcopy

@@ -174,16 +174,16 @@ def fit_xps(profile, abscissa, baseline, peak_labels, constraints):
 class XPSCalibration(Analyzer):
     """Config for XPS analyzer.
 
-    Configuration files are recommneded due to the complexity of the analysis.
+    Configuration files are recommended due to the complexity of the analysis.
 
-    Example configuration::
+    .. code-block:: toml
 
         [reader]
         paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
         metadata = [
-            {"Incident Voltage": [400, "eV"]},
-            {"Incident Voltage": [400, "eV"]},
-            {"Incident Voltage": [400, "eV"]}
+            {"Incident Voltage" = [400, "eV"]},
+            {"Incident Voltage" = [400, "eV"]},
+            {"Incident Voltage" = [400, "eV"]},
         ]
 
         [task]
