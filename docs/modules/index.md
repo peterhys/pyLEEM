@@ -10,7 +10,6 @@ roi
 config
 metadata
 metainfo
-utils
 analyzer
 stitch
 sees

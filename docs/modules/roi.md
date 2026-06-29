@@ -1,28 +1,43 @@
 # `pyleem.roi`
 
-Line ROI for profile extraction.
+ROI for image measurements. The ROI is a core element in the analyzer analysis,
+and is required for analyzer construction. For analysis that do not require an ROI,
+a placeholder NoROI is used. In particular, a LineROI is used to extract line profile from the image, and the
+AreaROI is used to extract area information or perform other types of analysis.
 
-{py:class}`~pyleem.roi.LineROI` wraps a line from an ImageJ ROI file or
-a manually specified line and stores the
-calibration parameters (`pixel_per_ev`, `peak_shift`).
+The ROI class can be constructed using a ImageJ ROI file or manually specified parameters.
+The ROI class can be subclassed and it should carry the analysis methods.
 
 ## Example
 
 ```python
-from pyleem.roi import LineROI
+import numpy as np
 
-# ImageJ .roi file
-roi = LineROI("line.roi")
+from pyleem.roi import LineROI, RectROI
 
-# Specify manually (coordinates in (row, col) / (y, x) order)
-roi = LineROI(src=(256, 10), dst=(256, 500), linewidth=20)
+image = np.arange(10000).reshape(100, 100)
 
-# Read profile from image
-profile = roi.read_profile(image)
+# Line ROI: extract a line profile and intensity statistics.
+line_roi = LineROI(src=(10, 5), dst=(10, 80), linewidth=3)
+line_measurement = line_roi.measure(image)
+profile = line_measurement.profile
 
-# Export back to ImageJ file
-roi.to_roi_object().tofile("line.roi")
+# Area ROI: measure intensity statistics inside a rectangle.
+area_roi = RectROI(top=20, left=30, bottom=50, right=60)
+area_measurement = area_roi.measure(image)
+mean_intensity = area_measurement.mean
+
+# Save and reload ImageJ ROI files.
+line_roi.tofile("line.roi")
+area_roi.tofile("area.roi")
+line_roi = LineROI(roi_file="line.roi")
 ```
+
+## Subclassing
+
+The ROI classes can be subclassed to add custom selection or analysis logic.
+The required methods are `measure`, `profile`, `fromfile`, and `tofile`.
+
 
 ```{eval-rst}
 .. automodule:: pyleem.roi

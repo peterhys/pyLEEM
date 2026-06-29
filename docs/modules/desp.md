@@ -1,59 +1,48 @@
 # `pyleem.analysis.desp`
 
-Diffuse Elastic Scattering Pattern (DESP) analysis.
+Diffuse Elastic Scattering Pattern (DESP) analysis. The analysis requires
+the pattern radius to energy conversion parabola parameters. The calibration analyzer
+needs to run on standard sample to obtain the calibration parameters.
 
-DESP analysis tracks the radius of the circular diffraction ring in a series of
-LEEM micrographs.  A change in radius corresponds to a shift in the collected
-electron energy.
+We can obtain the scattering energy and intensity from the pattern. The DESPAnalyzer
+can obtain the stack information from the sample measurements. The analyzer also
+profile image processing method and radius extraction method. 
 
-{py:class}`~pyleem.analysis.desp.DESPAnalyzer` detects the circle using OpenCV (bilateral
-filter, Otsu threshold, minimum enclosing circle). Pass a `potential_func`
-interpolation function to compute the surface potential on
-construction.
+{py:class}`~pyleem.analysis.desp.DESPCalibration` derives the calibration
+parameters from a reader stack with `"Start Voltage"` metadata. Its
+`analyze()` method measures the DESP radius for each image, fits voltage as a
+parabola of radius, and returns the fitted values under `"parabola_params"`.
 
-{py:class}`~pyleem.analysis.desp.DESPGroup` processes a batch of files with a shared
-`potential_func`. {py:func}`~pyleem.analysis.desp.calibrate_desp` builds the radius to potential
-interpolation function from standard-sample measurements and returns it in a dict
-under the key `"potential_func"`.
-
-{py:class}`~pyleem.analysis.desp.DESPConfig` drives calibration from a TOML config file
-(see the `config` module). The config file uses `path_pattern` (a glob pattern)
-under `[calibration]` instead of an explicit paths list.
+{py:class}`~pyleem.analysis.desp.DESPAnalyzer` uses the calibrated parabola
+parameters to measure the disk center, disk radius, and electron energy for
+each image in the stack. It can annotate images with the detected disk and plot
+electron energy against the reader time intervals.
 
 ## Example
 
 ```python
-from pyleem.analyzer import Analyzer
-from pyleem.analysis.desp import DESPAnalyzer, DESPConfig, DESPGroup, calibrate_desp
-import glob
-import matplotlib.pyplot as plt
+from pyleem.analysis.desp import DESPAnalyzer, DESPCalibration
+from pyleem.reader import UViewReader, read_files
 
-# DESP calibration
+readers = read_files(
+    ["desp_0.dat", "desp_1.dat", "desp_2.dat"],
+    reader_cls=UViewReader,
+)
 
-# from config file
-config = DESPConfig("desp_config.toml")
-cal_result = config.calibrate(update=True)
-potential_func = cal_result["potential_func"]
+calibration = DESPCalibration(readers)
+cal_result = calibration.analyze(window=None)
+parabola_params = cal_result["parabola_params"]
 
-# manually
-Au_paths = sorted(glob.glob("Au/*.dat"))
-cal_result = calibrate_desp([Analyzer(path) for path in Au_paths])
-potential_func = cal_result["potential_func"]
+analyzer = DESPAnalyzer(readers, parabola_params=parabola_params)
 
-# DESPAnalyzer
-analyzer = DESPAnalyzer("data.dat", potential_func)
-print(f"Potential: {analyzer.potential:.2f} eV")
-fig, ax = plt.subplots()
-analyzer.plot_radius(ax)
-plt.show()
+radius = analyzer.radii_array[0]
+energy = analyzer.energy_array[0]
 
-# DESPGroup
-paths = sorted(glob.glob("sample/*.dat"))
-group = DESPGroup(paths, potential_func)
+# plot the image with the radius and energy annotated
+ax = analyzer.plot_image(index=0, annotate=True)
 
-fig, ax = plt.subplots()
-group.plot_potential(ax)
-plt.show()
+# plot the energy vs. time
+ax = analyzer.plot_energy()
 ```
 
 ```{eval-rst}

@@ -5,13 +5,11 @@ single continuous profile.
 
 The current implementation exposes two functions:
 
-| Function | Purpose |
-|---|---|
-| {py:func}`~pyleem.operation.stitch.find_stitch_points` | Computes cut values between neighboring x ranges using `"midpoint"`, `"start"`, or `"end"` strategy. |
-| {py:func}`~pyleem.operation.stitch.stitch_profiles` | Applies mask boundaries to x/y profile arrays and concatenates the selected segments. |
+1. {py:func}`~pyleem.operation.stitch.find_stitch_points` computes cut values
+    between neighboring x ranges using `"midpoint"`, `"start"`, or `"end"` strategy.
+2. {py:func}`~pyleem.operation.stitch.stitch_profiles` applies mask boundaries to
+    x/y profile arrays and concatenates the selected segments.
 
-These helpers are used by {py:meth}`pyleem.analysis.spectra.SpectraBase.stitch_profiles`
-to combine spectra from overlapping acquisition ranges.
 
 ## Example
 

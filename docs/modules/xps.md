@@ -1,68 +1,86 @@
 # `pyleem.analysis.xps`
 
-X-ray Photoelectron Spectroscopy (XPS) analysis.
+X-ray Photoelectron Spectroscopy (XPS) analysis. The analysis requires
+calibration parameters `pixel_per_ev` and `peak_shift`. The calibration analyzer
+needs to run first to obtain the calibration parameters. The base class `SpectraBase`
+provides the basic stitching profile analysis.
 
-{py:class}`~pyleem.analysis.xps.XPSAnalyzer` converts the pixel axis to a binding energy
-scale using the incident photon energy and the ROI calibration. Basic peak fitting uses a
-Shirley background subtraction and a pseudo-Voigt model via `lmfit`.
+{py:class}`~pyleem.analysis.xps.XPSCalibration` derives `pixel_per_ev` and
+`peak_shift` from a stack of readers with `"Start Voltage"` and
+`"Incident Voltage"` metadata. The calibration `analyze()` method uses XPS fitting
+methods that require baseline intensities, total number of peaks, reference peak
+index and energy value.
 
-{py:class}`~pyleem.analysis.xps.XPSGroup` processes multiple spectra together.
-{py:func}`~pyleem.analysis.xps.calibrate_xps` derives `pixel_per_ev` and `peak_shift` by
-fitting peaks in pixel space across scans acquired at known start voltages. Pass
-`incident_voltage` and optionally `ref_index` / `ref_value` in `cal_params` to
-anchor the energy scale to a known reference peak.
+{py:class}`~pyleem.analysis.xps.XPSAnalyzer` converts the pixel axis to binding
+energy, fits profiles with Shirley background subtraction and pseudo-Voigt
+peaks, plots fit results, and can stitch profiles through the shared spectra base class.
 
-{py:class}`~pyleem.analysis.xps.XPSConfig` drives calibration from a TOML config file
-(see the `config` module).
+The LEEM spectra analyzer has limited energy range, large energy range spectra requires
+to be stitched together. The stitching method takes a list of indices and determines
+the overlapped regions, and outputs a combined profile.
 
 ## Example
 
 ```python
-from pyleem.analysis.xps import XPSAnalyzer, XPSConfig, XPSGroup, calibrate_xps
-from pyleem.analyzer import ProfileAnalyzer
+from pyleem.analysis.xps import XPSAnalyzer, XPSCalibration
+from pyleem.reader import UViewReader, read_files
 from pyleem.roi import LineROI
-import glob
-import matplotlib.pyplot as plt
 
-# XPS calibration
+readers = read_files(
+    ["xps_0.dat", "xps_1.dat", "xps_2.dat"],
+    reader_cls=UViewReader,
+    metadata_list=[
+        {"Incident Voltage": (400, "eV")},
+        {"Incident Voltage": (400, "eV")},
+        {"Incident Voltage": (400, "eV")},
+    ],
+)
+roi = LineROI(src=(0, 0), dst=(0, 127), linewidth=1)
 
-# from config file
-config = XPSConfig("xps_config.toml")
-cal_result = config.calibrate(reset=True, update=True)
+calibration = XPSCalibration(readers, roi=roi)
+cal_result = calibration.analyze(
+    baselines=[(197, 100)] * len(readers),
+    num_peaks=1,
+    ref_index=0,
+    ref_value=285.0,
+)
 pixel_per_ev = cal_result["pixel_per_ev"]
 peak_shift = cal_result["peak_shift"]
 
-# manually set the paths
-roi = LineROI(src=(256, 10), dst=(256, 500), linewidth=20)
-paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
-cal_params = {
-    "baselines": [(200, 80), (200, 80), (200, 80)],
-    "num_peaks": 1,
-    "ref_index": 0,
-    "ref_value": 84.0,  # Au 4f7/2 reference in eV
-    "incident_voltage": 400,
-}
-cal_result = calibrate_xps([ProfileAnalyzer(path, roi) for path in paths], cal_params)
-pixel_per_ev, peak_shift = cal_result["pixel_per_ev"], cal_result["peak_shift"]
+analyzer = XPSAnalyzer(
+    readers,
+    roi=roi,
+    pixel_per_ev=pixel_per_ev,
+    peak_shift=peak_shift,
+)
 
-# XPSAnalyzer
-analyzer = XPSAnalyzer("data.dat", roi, pixel_per_ev, peak_shift, incident_voltage=400)
+binding_energy = analyzer.get_binding_energy(0)
+fit_result, background = analyzer.fit(0, num_peaks=1, baseline=(200, 100))
+stitched_energy, stitched_profile = analyzer.stitch_profiles([0, 1, 2])
 
-# Fit with two peaks; baseline = (left_bg, right_bg) intensities
-result, bg = analyzer.fit(num_peaks=2, baseline=(200, 80))
+ax = analyzer.plot_profile(
+    0,
+    show_fit=True,
+    num_peaks=1,
+    baseline=(200, 100),
+)
+print(fit_result.best_values)
+```
 
-fig, axes = plt.subplots(2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]})
-analyzer.plot_fit(axes, result, bg)
-plt.tight_layout()
-plt.show()
+## Stitching Profiles
 
-# Access fit parameters
-for name, param in result.params.items():
-    print(f"{name}: {param.value:.3f}")
+The `stitch_method` argument can be `"midpoint"`, `"start"`, or `"end"`.
 
-# XPSGroup
-paths = sorted(glob.glob("sample/*.dat"))
-group = XPSGroup(paths, roi, pixel_per_ev, peak_shift, incident_voltage=400)
+```python
+# Use the calibrated analyzer from the example above.
+stitched_energy, stitched_profile = analyzer.stitch_profiles(
+    indices=[0, 1, 2],
+    stitch_method="midpoint",
+)
+
+ax.plot(stitched_energy, stitched_profile)
+ax.set_xlabel("Binding Energy [eV]")
+ax.set_ylabel("Intensity")
 ```
 
 ```{eval-rst}

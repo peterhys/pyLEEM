@@ -120,6 +120,7 @@ sigma = 0
 ```
 
 ```python
+import pyleem.analysis.sees  # registers SEESCalibration class
 from pyleem.config import load_config
 from pyleem.workflow import Workflow
 

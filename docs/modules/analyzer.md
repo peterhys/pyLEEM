@@ -1,41 +1,92 @@
 # `pyleem.analyzer`
 
-Core analyzer classes for LEEM images, line profiles, and grouped workflows.
+Analyzer is the core class for domain-specific analysis. The `Analyzer` class can perform
+basic raw data analysis. However, it is not required to subclass the `Analyzer` class.
 
-This module contains the base classes used across all domain-specific analyzers:
+Analyzers perform analysis on a LEEM data stack. For metadata and information access, they
+are accessed by index. In the analysis process, three levels of images are available: 
+raw, processed, and annotated. Raw image is the original image, processed image is defined
+by the subclass, which is used for analysis. Annotation are allowed for the plotting purposes,
+this could be metadata overlay, scale bar or custom annotation.
 
-- {py:class}`~pyleem.analyzer.Analyzer` — wraps a single `.dat` file and exposes its image and metadata.
-- {py:class}`~pyleem.analyzer.ProfileAnalyzer` — extends `Analyzer` with line-profile extraction.
-  Subclasses set `_abscissa`, `_abscissa_label`, `_ordinate`, `_ordinate_label` directly in `__init__`
-  to define their axis representation. The attributes are property accessed by `abscissa`, `abscissa_label`,
-  `ordinate`, and `ordinate_label`.
-- {py:class}`~pyleem.analyzer.AnalyzerGroup` — manages a list of analyzer instances for batch and
-  time-series workflows.
+Each analyzer takes ROI and readers as inputs. For analysis that do not require an ROI, a
+placeholder NoROI is used. All ROI analysis are performed on the processed image. Custom
+methods can access the raw image for additional analysis.
+
+For designated workflow, configuration file can be used to build, run and save the analysis.
+To allow workflow to run the analysis, the `analyze` method is required.  The analyzer should
+be free of the configuration logic so other methods can be used for different analysis.
 
 ## Example
 
+Here we show a simple example of extracting metadata and plot the image stack vs the metadata.
+
+The processed image is a background-subtracted image. We add the metadata overlay to the image.
+Here we show that we can add the metadata to the image as an overlay. And we perform simple
+analysis to obtain the image intensity vs the voltage.
+
 ```python
-from pyleem.analyzer import Analyzer, ProfileAnalyzer, AnalyzerGroup
+from pyleem.analyzer import Analyzer
+from pyleem.reader import UViewReader, read_files
 from pyleem.roi import LineROI
+from pyleem.annotation import MetadataTextMixin
 import matplotlib.pyplot as plt
 
-# metadata output
-analyzer = Analyzer("data.dat")
-print(analyzer.metadata["Start Voltage"])
 
-# plot the raw image
-analyzer.plot_image()
+class VoltageProfileAnalyzer(MetadataTextMixin, Analyzer):
+    """Analyzer for voltage-dependent line profiles."""
 
-# line profile non domain specific
-roi = LineROI(src=(256, 10), dst=(256, 500), linewidth=20)
-analyzer = ProfileAnalyzer("data.dat", roi)
-analyzer.plot_profile()
+    def get_processed_image(self, index):
+        """Return a background-subtracted image."""
+        image = self.get_raw_image(index).astype(float)
+        background = self.get_raw_image(0).astype(float)
+        return image - background
 
-# batch analysis and time intervals
-paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
-analyzers = [Analyzer(path) for path in paths]
-group = AnalyzerGroup(analyzers)
-time_intervals = group.get_time_intervals()
+    def annotate_image(self, index, ax):
+        """Label the image with the voltage."""
+        voltage, unit = self.get_metadata("Voltage", index)
+        return self.add_metadata_text(index, ax, labels=["Voltage"])
+
+    def analyze(self):
+        """Analyze the total image intensity vs the voltage."""
+        image_intensity = [
+            self.get_processed_image(index).sum() for index in self.indices
+        ]
+        voltages = [self.get_metadata("Voltage", index)[0] for index in self.indices]
+        return image_intensity, voltages
+
+    def plot_intensity(self, ax=None):
+        """Plot the image intensity vs the voltage."""
+        image_intensity, voltages = self.analyze()
+        ax = ax or plt.gca()
+        ax.plot(voltages, image_intensity)
+        ax.set_xlabel("Voltage [V]")
+        ax.set_ylabel("Intensity")
+        return ax
+
+
+readers = read_files(
+    ["data_0.dat", "data_1.dat", "data_2.dat"],
+    reader_cls=UViewReader,
+    metadata_list=[
+        {"Voltage": (4.0, "V")},
+        {"Voltage": (4.5, "V")},
+        {"Voltage": (5.0, "V")},
+    ],
+)
+
+analyzer = VoltageProfileAnalyzer(readers)
+
+
+# Plot the processed image and add the voltage annotation.
+# The second image is plotted.
+analyzer.plot_image(index=1, annotate=True)
+
+# obtain the analysis result
+image_intensity, voltages = analyzer.analyze()
+
+# plot the intensity vs the voltage
+analyzer.plot_intensity()
 ```
 
 ```{eval-rst}
