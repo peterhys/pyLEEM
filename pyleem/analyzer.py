@@ -58,15 +58,6 @@ class Analyzer:
         self.roi = roi or NoROI()
         self.indices = range(len(self.readers))
 
-    def get_image(self, index, kind="raw"):
-        """Return the image."""
-        if kind == "raw":
-            return self.get_raw_image(index)
-        elif kind == "processed":
-            return self.get_processed_image(index)
-        else:
-            raise ValueError(f"Invalid image kind: {kind}")
-
     def annotate_image(self, index, ax):
         """Annotate the image for matplotlib plotting.
 
@@ -76,7 +67,7 @@ class Analyzer:
         """
         return ax
 
-    def plot_image(self, index, ax=None, kind="processed", annotate=False):
+    def plot_image(self, index, ax=None, annotate=False):
         """Plot image data.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
@@ -84,7 +75,7 @@ class Analyzer:
         """
         ax = ax or plt.gca()
 
-        image = self.get_image(index, kind=kind)
+        image = self.get_processed_image(index)
         ax.imshow(image)
 
         if annotate:
@@ -92,19 +83,19 @@ class Analyzer:
 
         ax.set_xlabel("X [pixels]")
         ax.set_ylabel("Y [pixels]")
-        ax.set_title(f"{kind.capitalize()} Image Data")
+        ax.set_title("Image Data")
 
         return ax
 
-    def get_measurement(self, index, kind="processed"):
+    def get_measurement(self, index):
         """Measure the image data."""
-        image = self.get_image(index, kind=kind)
+        image = self.get_processed_image(index)
 
         return self.roi.measure(image)
 
-    def get_profile(self, index, kind="processed"):
+    def get_profile(self, index):
         """Extract the line profile from the image data."""
-        return self.get_measurement(index, kind=kind).profile
+        return self.get_measurement(index).profile
 
     def get_pixel(self, index):
         """Return the pixel positions for a profile."""

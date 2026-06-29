@@ -103,20 +103,12 @@ def test_analyzer_get_image(xps_reader, mock_analyzer):
     """Test get_image dispatches raw and processed images."""
     analyzer = mock_analyzer([xps_reader])
 
-    assert np.array_equal(analyzer.get_image(0, kind="raw"), xps_reader.image)
-    assert np.array_equal(analyzer.get_image(0, kind="processed"), xps_reader.image + 1)
-
-
-def test_analyzer_get_image_raise(xps_reader, mock_analyzer):
-    """Test get_image rejects unknown image kinds."""
-    analyzer = mock_analyzer([xps_reader])
-
-    with pytest.raises(ValueError, match="Invalid image kind"):
-        analyzer.get_image(0, kind="other")
+    assert np.array_equal(analyzer.get_raw_image(0), xps_reader.image)
+    assert np.array_equal(analyzer.get_processed_image(0), xps_reader.image + 1)
 
 
 def test_analyzer_plot_image(xps_reader, mock_analyzer):
-    """Test plot_image draws the requested image kind."""
+    """Test plot_image draws the processed image."""
     analyzer = mock_analyzer([xps_reader])
     fig, ax = plt.subplots()
 
@@ -125,14 +117,6 @@ def test_analyzer_plot_image(xps_reader, mock_analyzer):
 
     plotted = np.asarray(ax.images[0].get_array())
     assert np.array_equal(plotted, xps_reader.image + 1)
-    plt.close(fig)
-
-    # raw image
-    fig, ax = plt.subplots()
-    analyzer.plot_image(0, ax=ax, kind="raw")
-
-    plotted = np.asarray(ax.images[0].get_array())
-    assert np.array_equal(plotted, xps_reader.image)
     plt.close(fig)
 
 
@@ -155,9 +139,6 @@ def test_analyzer_get_measurement(xps_reader, roi, mock_analyzer):
 
     measurement = analyzer.get_measurement(0)
     assert np.array_equal(measurement.profile, xps_reader.image[0, :] + 1)
-
-    measurement = analyzer.get_measurement(0, kind="raw")
-    assert np.array_equal(measurement.profile, xps_reader.image[0, :])
 
 
 def test_analyzer_get_profile(xps_reader, roi, mock_analyzer):
