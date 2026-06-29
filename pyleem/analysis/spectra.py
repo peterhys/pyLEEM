@@ -26,7 +26,7 @@ class SpectraBase(Analyzer):
     def stitch_profiles(self, indices, stitch_method="midpoint"):
         """Stitch profiles together.
 
-        The indices needs to be in the order of stiching.
+        The indices needs to be in the order of stitching.
         """
         x_array_list = [self.get_kinetic_energy(index) for index in indices]
         profile_list = [self.get_profile(index) for index in indices]

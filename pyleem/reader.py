@@ -10,7 +10,7 @@ class Reader(ABC):
     The reader should implement the get_image and get_metadata methods.
     The property metadata and image are default and extract values at runtime.
 
-    The reader does not necessary need to parse a physical file path.'
+    The reader does not necessarily need to parse a physical file path.'
     However, the comparison operator __lt__ is required to be implemented
     so that the reader is sortable.
     """

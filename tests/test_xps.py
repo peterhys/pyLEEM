@@ -7,7 +7,7 @@ from pyleem.analysis.xps import (
     XPSAnalyzer,
     XPSCalibration,
     fit_xps,
-    parameter_contraint,
+    parameter_constraint,
     parameter_estimation,
     pseudo_voigt_fits,
     shirley_background,
@@ -114,7 +114,7 @@ def test_parameter_estimation_edge_cases():
     assert centers[0] < centers[1]
 
 
-def test_parameter_contraint():
+def test_parameter_constraint():
     """Test parameter constraint generation."""
     x = np.linspace(0, 100, 2000)
     peaks_data = [
@@ -122,7 +122,7 @@ def test_parameter_contraint():
     ]
     profile = sum(peaks_data) + 3
 
-    constraints = parameter_contraint(profile, 4, peak_prominence=0.05)
+    constraints = parameter_constraint(profile, 4, peak_prominence=0.05)
 
     for i in range(1, 5):
         assert f"p{i}_center" in constraints
@@ -137,7 +137,7 @@ def test_fit_xps():
     peak1 = 50 * np.exp(-((x - 40) ** 2) / (2 * 5**2))
     profile = peak1 + np.linspace(10, 5, 500)
 
-    constraints = parameter_contraint(profile, 1, peak_prominence=0.1)
+    constraints = parameter_constraint(profile, 1, peak_prominence=0.1)
     peak_labels = ["p1"]
     baseline = (10, 5)
     result, bg = fit_xps(profile, x, baseline, peak_labels, constraints)

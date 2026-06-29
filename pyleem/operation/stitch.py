@@ -1,4 +1,4 @@
-"""Operation fucntions to stitch profiles together."""
+"""Operation functions to stitch profiles together."""
 
 import numpy as np
 

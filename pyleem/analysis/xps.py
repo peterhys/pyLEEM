@@ -126,7 +126,7 @@ def parameter_estimation(profile, num_peaks, peak_prominence=0.1):
     return peaks, sigmas, peak_areas
 
 
-def parameter_contraint(profile, num_peaks, peak_prominence=0.1):
+def parameter_constraint(profile, num_peaks, peak_prominence=0.1):
     """Create parameter constraints dictionary for XPS fitting.
 
     :param ndarray profile: XPS intensity profile.
@@ -155,7 +155,7 @@ def fit_xps(profile, abscissa, baseline, peak_labels, constraints):
     :param ndarray abscissa: X-axis values (pixels or energy).
     :param tuple baseline: Tuple (left_baseline, right_baseline) intensities.
     :param list peak_labels: List of peak label strings.
-    :param dict constraints: Parameter constraints from parameter_contraint().
+    :param dict constraints: Parameter constraints from parameter_constraint().
     :return: Fit result and Shirley background.
     :rtype: tuple(lmfit.ModelResult, ndarray)
     """
@@ -174,21 +174,25 @@ def fit_xps(profile, abscissa, baseline, peak_labels, constraints):
 class XPSCalibration(Analyzer):
     """Config for XPS analyzer.
 
-    [reader]
-    paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
-    metadata = [
-        {"Incident Voltage": [400, "eV"]},
-        {"Incident Voltage": [400, "eV"]},
-        {"Incident Voltage": [400, "eV"]}
-    ]
+    Configuration files are recommneded due to the complexity of the analysis.
 
-    [task]
-    baselines = [[197, 100], [197, 100], [197, 100]]
-    num_peaks = 1
-    # optional
-    ref_index = 0
-    ref_value = 285.0
-    peak_prominence = 0.1
+    Example configuration::
+
+        [reader]
+        paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
+        metadata = [
+            {"Incident Voltage": [400, "eV"]},
+            {"Incident Voltage": [400, "eV"]},
+            {"Incident Voltage": [400, "eV"]}
+        ]
+
+        [task]
+        baselines = [[197, 100], [197, 100], [197, 100]]
+        num_peaks = 1
+        # optional
+        ref_index = 0
+        ref_value = 285.0
+        peak_prominence = 0.1
     """
 
     save_keys = ("pixel_per_ev", "peak_shift")
@@ -227,7 +231,7 @@ class XPSCalibration(Analyzer):
         for index in self.indices:
             profile = self.get_profile(index)
             pixel = self.get_pixel(index)
-            constraints = parameter_contraint(profile, num_peaks, peak_prominence)
+            constraints = parameter_constraint(profile, num_peaks, peak_prominence)
             peak_labels = [f"p{j}" for j in range(1, num_peaks + 1)]
             result, bg = fit_xps(
                 profile, pixel, baselines[index], peak_labels, constraints
@@ -260,9 +264,11 @@ class XPSAnalyzer(SpectraBase):
 
     Handles energy calibration and provides binding energy scales.
 
-    :param str or Path path: Path to LEEM data file.
-    :param dict or LineROI roi: Region of interest for profile extraction.
-    :param float incident_voltage: X-ray beam energy.
+    :param list readers: List of readers.
+    :param ROI roi: Region of interest for profile extraction.
+    :param float pixel_per_ev: Pixel per eV.
+    :param float peak_shift: Peak shift.
+    :param int onset: Onset index.
     """
 
     def __init__(self, readers, roi, pixel_per_ev, peak_shift, onset=0):
@@ -286,7 +292,7 @@ class XPSAnalyzer(SpectraBase):
 
         profile = self.get_profile(index)
         BE = self.get_binding_energy(index)
-        constraints = parameter_contraint(profile, num_peaks, peak_prominence)
+        constraints = parameter_constraint(profile, num_peaks, peak_prominence)
 
         # Convert peak positions from pixel space to binding energy space
         for i in range(1, num_peaks + 1):

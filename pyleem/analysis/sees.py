@@ -60,8 +60,8 @@ class SEESAnalyzer(SEESBase):
     Analyzes SEES profiles to determine surface potentials by measuring
     secondary electron emission onset. Onset shifts with surface charging.
 
-    :param str or Path path: Path to LEEM data file.
-    :param dict or LineROI roi: Region of interest for profile extraction.
+    :param list readers: List of readers.
+    :param ROI roi: Region of interest for profile extraction.
     :param float sigma: Gaussian filter sigma for smoothing.
 
     :ivar int pk_idx: Index of steepest rise.

@@ -2,6 +2,7 @@
 
 The file is structured as follows:
 
+```toml
 [session]
 version = "0.1.0"
 reader = "UViewReader"
@@ -27,6 +28,7 @@ incident_voltage = 400
 [result]
 pixel_per_ev = 166.0
 peak_shift = 3.75
+```
 """
 
 from copy import deepcopy

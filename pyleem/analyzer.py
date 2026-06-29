@@ -135,9 +135,9 @@ class Analyzer:
         The method is not required if the analyzer does not need to
         work with configuration and workflow logic.
         The analyze method is recommended to be stack analysis
-        logic instead of acting on invidual readers.
+        logic instead of acting on individual readers.
 
-        For large data output, it is recommanded for analyze to save
+        For large data output, it is recommended for analyze to save
         the result to a file.
         """
         raise NotImplementedError("'analyze' method is not implemented")

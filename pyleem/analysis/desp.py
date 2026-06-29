@@ -53,9 +53,9 @@ def get_radius(image):
     """
 
     contours, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    largest_contour = max(contours, key=cv2.contourArea)
     if len(contours) == 0:
         raise ValueError("No disk pattern found in image.")
+    largest_contour = max(contours, key=cv2.contourArea)
     (x, y), r = cv2.minEnclosingCircle(largest_contour)
     return x, y, r
 
@@ -238,13 +238,13 @@ class DESPAnalyzer(DESPAnalyzerBase):
     Analyzes DESP micrographs to detect circular diffraction patterns
     and measure charging effects through pattern radius changes.
 
-    :param str or Path path: Path to LEEM data file.
-    :param callable interp_func: Interpolation function for radius-to-energy conversion.
+    :param list readers: List of readers.
+    :param dict parabola_params: Parabola parameters.
 
-    :ivar float x: X-coordinate of circle center.
-    :ivar float y: Y-coordinate of circle center.
-    :ivar float radius: Circle radius in pixels.
-    :ivar float energy: Electron energy if interpolation function provided.
+    :ivar list x_array: List of X-coordinates of circle centers.
+    :ivar list y_array: List of Y-coordinates of circle centers.
+    :ivar list radii_array: List of circle radii in pixels.
+    :ivar list energy_array: List of electron energies.
     """
 
     def __init__(self, readers, parabola_params, roi=None, **parameters):
