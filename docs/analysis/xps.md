@@ -1,23 +1,24 @@
-# `pyleem.analysis.xps`
+# XPS Analysis
 
-X-ray Photoelectron Spectroscopy (XPS) analysis. The analysis requires
-calibration parameters `pixel_per_ev` and `peak_shift`. The calibration analyzer
-needs to run first to obtain the calibration parameters. The base class `SpectraBase`
+X-ray Photoelectron Spectroscopy (XPS) analysis requires calibration
+parameters `pixel_per_ev` and `peak_shift`. The calibration analyzer needs to
+run first to obtain the calibration parameters. The base class `SpectraBase`
 provides the basic stitching profile analysis.
 
 {py:class}`~pyleem.analysis.xps.XPSCalibration` derives `pixel_per_ev` and
 `peak_shift` from a stack of readers with `"Start Voltage"` and
-`"Incident Voltage"` metadata. The calibration `analyze()` method uses XPS fitting
-methods that require baseline intensities, total number of peaks, reference peak
-index and energy value.
+`"Incident Voltage"` metadata. The calibration `analyze()` method uses XPS
+fitting methods that require baseline intensities, total number of peaks,
+reference peak index and energy value.
 
-{py:class}`~pyleem.analysis.xps.XPSAnalyzer` converts the pixel axis to binding
-energy, fits profiles with Shirley background subtraction and pseudo-Voigt
-peaks, plots fit results, and can stitch profiles through the shared spectra base class.
+{py:class}`~pyleem.analysis.xps.XPSAnalyzer` converts the pixel axis to
+binding energy, fits profiles with Shirley background subtraction and
+pseudo-Voigt peaks, plots fit results, and can stitch profiles through the
+shared spectra base class.
 
-The LEEM spectra analyzer has limited energy range, large energy range spectra requires
-to be stitched together. The stitching method takes a list of indices and determines
-the overlapped regions, and outputs a combined profile.
+The LEEM spectra analyzer has limited energy range, large energy range spectra
+requires to be stitched together. The stitching method takes a list of indices
+and determines the overlapped regions, and outputs a combined profile.
 
 ## Example
 
@@ -81,10 +82,4 @@ stitched_energy, stitched_profile = analyzer.stitch_profiles(
 ax.plot(stitched_energy, stitched_profile)
 ax.set_xlabel("Binding Energy [eV]")
 ax.set_ylabel("Intensity")
-```
-
-```{eval-rst}
-.. automodule:: pyleem.analysis.xps
-   :members:
-   :show-inheritance:
 ```

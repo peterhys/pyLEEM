@@ -1,9 +1,9 @@
-# `pyleem.analysis.xas`
+# XAS Analysis
 
 X-ray Absorption Spectroscopy (XAS) analysis measures ROI intensity across an
 image stack. Drift correction is available as an explicit step before intensity
-extraction. If `draft_correct` method is not called, the raw image is used
-for analysis.
+extraction. If `drift_correct` method is not called, the raw image is used for
+analysis.
 
 ## Example
 
@@ -28,10 +28,4 @@ corrected_images, shifts = analyzer.drift_correct(sigma=3, crop_size=128)
 intensities = analyzer.get_intensities()
 
 ax = analyzer.plot_intensity()
-```
-
-```{eval-rst}
-.. automodule:: pyleem.analysis.xas
-   :members:
-   :show-inheritance:
 ```

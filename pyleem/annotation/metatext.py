@@ -67,7 +67,8 @@ class MetadataTextMixin:
     Inherit from this mixin before the analyzer class, then call
     annotate_metadata from the subclass annotate_image method.
 
-    Example:
+    Example::
+
         class MetadataXPSAnalyzer(MetadataTextMixin, XPSAnalyzer):
 
             metadata_labels = DEFAULT_METADATA_LABELS

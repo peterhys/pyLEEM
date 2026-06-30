@@ -1,29 +1,35 @@
-# `pyleem.analyzer`
+# Analyzer API
 
-Analyzer is the core class for domain-specific analysis. The `Analyzer` class can perform
-basic raw data analysis. However, it is not required to subclass the `Analyzer` class.
+Analyzer is the core class for domain-specific analysis. The `Analyzer` class
+can perform basic raw data analysis. However, it is not required to subclass
+the `Analyzer` class.
 
-Analyzers perform analysis on a LEEM data stack. For metadata and information access, they
-are accessed by index. In the analysis process, three levels of images are available: 
-raw, processed, and annotated. Raw image is the original image, processed image is defined
-by the subclass, which is used for analysis. Annotation are allowed for the plotting purposes,
-this could be metadata overlay, scale bar or custom annotation.
+Analyzers perform analysis on a LEEM data stack. For metadata and information
+access, they are accessed by index. In the analysis process, three levels of
+images are available: raw, processed, and annotated. Raw image is the original
+image, processed image is defined by the subclass, which is used for analysis.
+Annotation are allowed for the plotting purposes, this could be metadata
+overlay, scale bar or custom annotation.
 
-Each analyzer takes ROI and readers as inputs. For analysis that do not require an ROI, a
-placeholder NoROI is used. All ROI analysis are performed on the processed image. Custom
-methods can access the raw image for additional analysis.
+Each analyzer takes ROI and readers as inputs. For analysis that do not require
+an ROI, a placeholder NoROI is used. All ROI analysis are performed on the
+processed image. Custom methods can access the raw image for additional
+analysis.
 
-For designated workflow, configuration file can be used to build, run and save the analysis.
-To allow workflow to run the analysis, the `analyze` method is required.  The analyzer should
-be free of the configuration logic so other methods can be used for different analysis.
+For designated workflow, configuration file can be used to build, run and save
+the analysis. To allow workflow to run the analysis, the `analyze` method is
+required. The analyzer should be free of the configuration logic so other
+methods can be used for different analysis.
 
 ## Example
 
-Here we show a simple example of extracting metadata and plot the image stack vs the metadata.
+Here we show a simple example of extracting metadata and plot the image stack
+vs the metadata.
 
-The processed image is a background-subtracted image. We add the metadata overlay to the image.
-Here we show that we can add the metadata to the image as an overlay. And we perform simple
-analysis to obtain the image intensity vs the voltage.
+The processed image is a background-subtracted image. We add the metadata
+overlay to the image. Here we show that we can add the metadata to the image as
+an overlay. And we perform simple analysis to obtain the image intensity vs the
+voltage.
 
 ```python
 from pyleem.analyzer import Analyzer
@@ -87,10 +93,4 @@ image_intensity, voltages = analyzer.analyze()
 
 # plot the intensity vs the voltage
 analyzer.plot_intensity()
-```
-
-```{eval-rst}
-.. automodule:: pyleem.analyzer
-   :members:
-   :show-inheritance:
 ```

@@ -1,19 +1,21 @@
-# `pyleem.analysis.sees`
+# SEES Analysis
 
-Secondary Electron Energy Spectroscopy (SEES) analysis. The analysis requires
-calibration parameters `pixel_per_ev` and `peak_shift`. The calibration analyzer
-needs to run first to obtain the calibration parameters. The base class `SEESBase`
-provides the basic Gaussian smoothing of the profile through the parameter `sigma`.
+Secondary Electron Energy Spectroscopy (SEES) analysis requires calibration
+parameters `pixel_per_ev` and `peak_shift`. The calibration analyzer needs to
+run first to obtain the calibration parameters. The base class `SEESBase`
+provides the basic Gaussian smoothing of the profile through the parameter
+`sigma`.
 
-{py:func}`~pyleem.analysis.sees.SEES_onset` finds the steepest profile rise and
-extrapolates the onset position in pixel coordinates.
+{py:func}`~pyleem.analysis.sees.SEES_onset` finds the steepest profile rise
+and extrapolates the onset position in pixel coordinates.
 
 {py:class}`~pyleem.analysis.sees.SEESCalibration` derives `pixel_per_ev` and
 `peak_shift` from a stack of readers with `"Start Voltage"` metadata.
 
-{py:class}`~pyleem.analysis.sees.SEESAnalyzer` analyzes SEES profiles with the calibrated parameters.
-It converts profile pixels to kinetic energy, returns the surface potential, and
-can plot the profile with an optional onset fit overlay.
+{py:class}`~pyleem.analysis.sees.SEESAnalyzer` analyzes SEES profiles with the
+calibrated parameters. It converts profile pixels to kinetic energy, returns
+the surface potential, and can plot the profile with an optional onset fit
+overlay.
 
 ## Example
 
@@ -44,10 +46,4 @@ result = analyzer.analyze_profile(index=0)
 surface_potential = result["surface_potential"]
 
 ax = analyzer.plot_profile(0, show_fit=True)
-```
-
-```{eval-rst}
-.. automodule:: pyleem.analysis.sees
-   :members:
-   :show-inheritance:
 ```

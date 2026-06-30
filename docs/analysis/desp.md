@@ -1,12 +1,12 @@
-# `pyleem.analysis.desp`
+# DESP Analysis
 
-Diffuse Elastic Scattering Pattern (DESP) analysis. The analysis requires
-the pattern radius to energy conversion parabola parameters. The calibration analyzer
-needs to run on standard sample to obtain the calibration parameters.
+Diffuse Elastic Scattering Pattern (DESP) analysis requires the pattern radius
+to energy conversion parabola parameters. The calibration analyzer needs to run
+on standard sample to obtain the calibration parameters.
 
-We can obtain the scattering energy and intensity from the pattern. The DESPAnalyzer
-can obtain the stack information from the sample measurements. The analyzer also
-profile image processing method and radius extraction method. 
+We can obtain the scattering energy and intensity from the pattern. The
+DESPAnalyzer can obtain the stack information from the sample measurements. The
+analyzer also profile image processing method and radius extraction method.
 
 {py:class}`~pyleem.analysis.desp.DESPCalibration` derives the calibration
 parameters from a reader stack with `"Start Voltage"` metadata. Its
@@ -43,10 +43,4 @@ ax = analyzer.plot_image(index=0, annotate=True)
 
 # plot the energy vs. time
 ax = analyzer.plot_energy()
-```
-
-```{eval-rst}
-.. automodule:: pyleem.analysis.desp
-   :members:
-   :show-inheritance:
 ```

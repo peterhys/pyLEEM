@@ -1,4 +1,4 @@
-# `pyleem.operation.stitch`
+# Sitch Spectra
 
 Profile stitching utilities for combining multiple overlapping spectra into a
 single continuous profile.
@@ -34,9 +34,4 @@ stitch_points = find_stitch_points(x_ranges, method="midpoint")
 mask_points = [x_ranges[0][0], *stitch_points, x_ranges[-1][1]]
 
 stitched_x, stitched_y = stitch_profiles(x_arrays, y_arrays, mask_points)
-```
-
-```{eval-rst}
-.. automodule:: pyleem.operation.stitch
-   :members:
 ```

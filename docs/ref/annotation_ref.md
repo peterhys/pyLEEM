@@ -1,12 +1,10 @@
-# `pyleem.annotation`
+# annotation
 
 Annotation mixins add plotting overlays to analyzer image plots. They are
 designed as class mixins that compose with `Analyzer` subclasses through
 `annotate_image()`. The method can be used by itself as well.
 
-## Metadata Text
-
-Use `MetadataTextMixin` to place selected reader metadata on image axes.
+## annotation.metatext
 
 ```{eval-rst}
 .. automodule:: pyleem.annotation.metatext
@@ -14,7 +12,7 @@ Use `MetadataTextMixin` to place selected reader metadata on image axes.
    :show-inheritance:
 ```
 
-## Scale Bar
+## annotation.scalebar
 
 Use `ScaleBarMixin` to draw a FOV-calibrated scale bar on image axes.
 
@@ -24,10 +22,7 @@ Use `ScaleBarMixin` to draw a FOV-calibrated scale bar on image axes.
    :show-inheritance:
 ```
 
-## ROI Drawing
-
-Use `ROIAnnotationMixin` to draw supported ROI objects on image
-axes.
+## annotation.drawroi
 
 ```{eval-rst}
 .. automodule:: pyleem.annotation.drawroi

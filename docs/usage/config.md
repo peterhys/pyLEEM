@@ -1,14 +1,17 @@
-# `pyleem.config` and `pyleem.workflow`
+# Config and Workflow
 
-The config and workflow modules work together to build, run and save the analysis.
-The config object is a state object that stores the input parameters and output results
-from the analyzer class. For analyzer to be properly interact with the workflow, the
-input and output parameters should be picklable. The config content follows the TOML format,
-with sections named `session`, `reader`, `roi`, `analyzer`, `task`, and `result`. Partial
-config content are allowed and can be updated, which allows configuration templates.
-The workflow object is a builder object that builds the readers, ROI, and analyzer objects
-from the config object. The workflow object also runs the analyzer and saves the result
-back to the config object.
+The config and workflow modules work together to build, run and save the
+analysis. The config object is a state object that stores the input parameters
+and output results from the analyzer class. For analyzer to be properly
+interact with the workflow, the input and output parameters should be
+picklable. The config content follows the TOML format, with sections named
+`session`, `reader`, `roi`, `analyzer`, `task`, and `result`. Partial config
+content are allowed and can be updated, which allows configuration templates.
+The workflow object is a builder object that builds the readers, ROI, and
+analyzer objects from the config object. The workflow object also runs the
+analyzer and saves the result back to the config object.
+
+
 
 ## Config sections
 
@@ -30,9 +33,10 @@ The reader section defines the reader class inputs. For large data stacks,
 `path_pattern` can be used to access the data files through a glob pattern.
 Only one of `paths` or `path_pattern` should be provided.
 
-For added metadata, `metadata_list` can be used to add per-reader metadata entries.
-For shared metadata, `metadata` can be used to add the same metadata entry to every reader.
-When both are provided, the `metadata_list` overrides the `metadata`.
+For added metadata, `metadata_list` can be used to add per-reader metadata
+entries. For shared metadata, `metadata` can be used to add the same metadata
+entry to every reader. When both are provided, the `metadata_list` overrides
+the `metadata`.
 
 | Name | Explanation |
 | --- | --- |
@@ -43,7 +47,8 @@ When both are provided, the `metadata_list` overrides the `metadata`.
 
 ### ROI
 
-The roi section defines the ROI class inputs. The inputs can be a roi file or a manually defined ROI.
+The roi section defines the ROI class inputs. The inputs can be a roi file or a
+manually defined ROI.
 
 ### Analyzer
 
@@ -99,7 +104,9 @@ workflow = Workflow(
 
 # Run and access the result directly
 result = workflow.run(
-    baselines=[[197, 100], [197, 100], [197, 100]], ref_value=285.0, peak_prominence=0.2
+    baselines=[[197, 100], [197, 100], [197, 100]],
+    ref_value=285.0,
+    peak_prominence=0.2,
 )
 
 # get the updated config
@@ -109,9 +116,9 @@ config = workflow.config
 workflow.save("xps_calibration_result.toml")
 ```
 
-The saved result file `xps_calibration_result.toml` is as follows, note
-the added/updated input parameters and result values. For example, the
-peak prominence is updated to 0.2.
+The saved result file `xps_calibration_result.toml` is as follows, note the
+added/updated input parameters and result values. For example, the peak
+prominence is updated to 0.2.
 
 ```toml
 [session]
@@ -141,12 +148,8 @@ pixel_per_ev = 165.8
 peak_shift = 3.72
 ```
 
-```{eval-rst}
-.. automodule:: pyleem.config
-   :members:
-   :show-inheritance:
+## API and Reference
 
-.. automodule:: pyleem.workflow
-   :members:
-   :show-inheritance:
-```
+- {doc}`../api/analyzer`: For analyzer subclass requirements.
+- {doc}`../ref/config_ref`: For config module details.
+- {doc}`../ref/workflow_ref`: For workflow module details.

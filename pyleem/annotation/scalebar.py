@@ -13,7 +13,8 @@ class ScaleBarMixin:
     Inherit from this class before the analyzer class, then call
     annotate_scalebar from the subclass annotate_image method.
 
-    Example:
+    Example::
+
         class ScaleBarAnalyzer(ScaleBarMixin, Analyzer):
 
             def annotate_image(self, index, ax):

@@ -81,7 +81,15 @@ def draw_roi(ax, roi, color="yellow", linewidth=2, **kwargs):
 
 
 class ROIAnnotationMixin:
-    """Mixin that draws the analyzer ROI on image plots."""
+    """Mixin that draws the analyzer ROI on image plots.
+    
+    Example::
+
+        class ROIAnalyzer(ROIAnnotationMixin, Analyzer):
+
+            def annotate_image(self, index, ax):
+                return self.annotate_roi(ax, self.roi)
+    """
 
     def annotate_roi(self, ax, roi, color="yellow", linewidth=2, **kwargs):
         """Add ROI annotation to an image axes."""

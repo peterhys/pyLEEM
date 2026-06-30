@@ -1,4 +1,6 @@
 # Third-Party Licenses
 
-```{include} ../THIRD_PARTY_LICENSES
+```{eval-rst}
+.. literalinclude:: ../THIRD_PARTY_LICENSES
+   :language: text
 ```
