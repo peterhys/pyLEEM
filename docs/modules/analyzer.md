@@ -80,7 +80,7 @@ analyzer = VoltageProfileAnalyzer(readers)
 
 # Plot the processed image and add the voltage annotation.
 # The second image is plotted.
-analyzer.plot_image(index=1, annotate=True)
+analyzer.plot_image(index=1, annotate=True, autolevel=True)
 
 # obtain the analysis result
 image_intensity, voltages = analyzer.analyze()
