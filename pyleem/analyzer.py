@@ -67,16 +67,30 @@ class Analyzer:
         """
         return ax
 
-    def plot_image(self, index, ax=None, annotate=False):
+    def get_autolevel(self, image):
+        """Return percentile display limits for image contrast."""
+
+        vmin, vmax = np.percentile(image, [1, 99])
+        if vmin == vmax:
+            # in case the image is uniform
+            return float(vmin) - 0.5, float(vmax) + 0.5
+
+        return float(vmin), float(vmax)
+
+    def plot_image(self, index, ax=None, annotate=False, autolevel=False):
         """Plot image data.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
-        :param str kind: Kind of image to plot.
+        :param bool autolevel: auto leveling the image. Act as auto-contrast.
         """
         ax = ax or plt.gca()
 
         image = self.get_processed_image(index)
-        ax.imshow(image)
+        if autolevel:
+            vmin, vmax = self.get_autolevel(image)
+            ax.imshow(image, vmin=vmin, vmax=vmax)
+        else:
+            ax.imshow(image)
 
         if annotate:
             self.annotate_image(index, ax)

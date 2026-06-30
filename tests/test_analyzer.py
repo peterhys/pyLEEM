@@ -133,6 +133,35 @@ def test_analyzer_plot_image_annotated(xps_reader, mock_analyzer):
     plt.close(fig)
 
 
+def test_analyzer_get_autolevel(xps_reader):
+    """Test autolevel returns percentile display limits."""
+    analyzer = Analyzer([xps_reader])
+    image = np.arange(101, dtype=float).reshape(1, 101)
+
+    vmin, vmax = analyzer.get_autolevel(image)
+
+    assert vmin == pytest.approx(1)
+    assert vmax == pytest.approx(99)
+
+
+def test_analyzer_plot_image_autolevel(raw_reader_factory, mock_analyzer):
+    """Test plot_image autolevel changes display limits only."""
+    image = np.arange(256 * 128, dtype=np.uint16).reshape(256, 128)
+    reader = raw_reader_factory("autolevel.dat", image)
+    analyzer = mock_analyzer([reader])
+    fig, ax = plt.subplots()
+
+    analyzer.plot_image(0, ax=ax, autolevel=True)
+
+    plotted = np.asarray(ax.images[0].get_array())
+    expected_image = image + 1
+    expected_limits = np.percentile(expected_image, [1, 99])
+
+    assert np.array_equal(plotted, expected_image)
+    assert ax.images[0].get_clim() == pytest.approx(tuple(expected_limits))
+    plt.close(fig)
+
+
 def test_analyzer_get_measurement(xps_reader, roi, mock_analyzer):
     """Test get_measurement measures the processed image by default."""
     analyzer = mock_analyzer([xps_reader], roi=roi)
