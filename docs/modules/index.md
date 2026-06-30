@@ -11,7 +11,9 @@ config
 metadata
 metainfo
 analyzer
-stitch
+annotation
+operation
+xas
 sees
 desp
 xps
