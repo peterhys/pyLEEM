@@ -7,8 +7,11 @@ TAdeJong/LEEM-analysis drift correction notebook:
 https://github.com/TAdeJong/LEEM-analysis/blob/master/2%20-%20Driftcorrection.ipynb
 """
 
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import numpy as np
-from scipy.ndimage import shift as shift_image
+from scipy.ndimage import shift as scipy_shift
 from skimage import filters
 from skimage.registration import phase_cross_correlation
 
@@ -52,25 +55,58 @@ def filter_images(images, sigma=3, crop_size=None):
     )
 
 
-def relative_shifts(images, upsample_factor=10):
+def choose_max_workers(max_workers):
+    """Choose the number of drift-correction worker threads."""
+    if max_workers is None:
+        return min(8, os.cpu_count() or 1)
+
+    if max_workers < 1:
+        raise ValueError("max_workers must be at least 1")
+
+    return int(max_workers)
+
+
+def registration_weight(error):
+    """Return a least-squares weight from a registration error."""
+    if np.isfinite(error):
+        return 1.0 / max(float(error), 1e-6)
+
+    return 0.0
+
+
+def relative_shifts(
+    images,
+    upsample_factor=10,
+    max_workers=None,
+    chunk_size=32,
+    max_distance=None,
+):
     """Return pairwise shifts needed to align image j to image i."""
-    count = images.shape[0]
-    shifts = np.zeros((count, count, 2), dtype=float)
-    weights = np.zeros((count, count), dtype=float)
+    if max_distance is not None and max_distance < 1:
+        raise ValueError("max_distance must be at least 1")
 
-    for i in range(count):
-        weights[i, i] = 1.0
-        for j in range(i + 1, count):
-            shift, error, _ = phase_cross_correlation(
-                images[i],
-                images[j],
-                upsample_factor=upsample_factor,
-            )
-            if np.isfinite(error):
-                weight = 1.0 / max(float(error), 1e-6)
-            else:
-                weight = 0.0
+    images = np.asarray(images)
+    frame_count = images.shape[0]
+    worker_count = choose_max_workers(max_workers)
 
+    shifts = np.zeros((frame_count, frame_count, 2), dtype=float)
+    weights = np.zeros((frame_count, frame_count), dtype=float)
+    pairs = frame_pairs(frame_count, max_distance=max_distance)
+
+    if worker_count == 1:
+        result_batches = [register_pairs(images, pairs, upsample_factor)]
+    else:
+        result_batches = register_pairs_threaded(
+            images,
+            pairs,
+            upsample_factor,
+            max_workers=worker_count,
+            chunk_size=chunk_size,
+        )
+
+    for results in result_batches:
+        for i, j, shift, error in results:
+            weight = registration_weight(error)
             shifts[i, j] = shift
             shifts[j, i] = -shift
             weights[i, j] = weight
@@ -79,65 +115,115 @@ def relative_shifts(images, upsample_factor=10):
     return shifts, weights
 
 
+def frame_pairs(count, max_distance=None):
+    """Yield frame pairs to register."""
+    for i in range(count):
+        if max_distance is None:
+            stop = count
+        else:
+            stop = min(count, i + max_distance + 1)
+
+        for j in range(i + 1, stop):
+            yield i, j
+
+
+def chunk_pairs(pairs, chunk_size):
+    """Yield fixed-size chunks from a stream of frame pairs."""
+    if chunk_size < 1:
+        raise ValueError("chunk_size must be at least 1")
+
+    chunk = []
+
+    for pair in pairs:
+        chunk.append(pair)
+        if len(chunk) == chunk_size:
+            yield chunk
+            chunk = []
+
+    if chunk:
+        yield chunk
+
+
+def register_pairs(images, pairs, upsample_factor):
+    """Register image pairs and return their measured shifts."""
+    results = []
+
+    for i, j in pairs:
+        shift, error, _ = phase_cross_correlation(
+            images[i],
+            images[j],
+            upsample_factor=upsample_factor,
+        )
+        results.append((i, j, shift, error))
+
+    return results
+
+
+def register_pairs_threaded(images, pairs, upsample_factor, max_workers, chunk_size):
+    """Register pair chunks with a thread pool."""
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for pair_chunk in chunk_pairs(pairs, chunk_size):
+            future = executor.submit(
+                register_pairs,
+                images,
+                pair_chunk,
+                upsample_factor,
+            )
+            futures.append(future)
+
+        for future in as_completed(futures):
+            yield future.result()
+
+
 def absolute_shifts(relative_shift_array, weights=None, reference_index=0):
     """Reduce pairwise shifts to correction shifts for each image."""
-    count = relative_shift_array.shape[0]
-    if count == 1:
+    frame_count = relative_shift_array.shape[0]
+    if frame_count == 1:
         return np.zeros((1, 2), dtype=float)
 
-    rows = []
-    values = []
+    equation_rows = []
+    measured_shifts = []
 
-    for i in range(count):
-        for j in range(i + 1, count):
+    for i in range(frame_count):
+        for j in range(i + 1, frame_count):
             weight = 1.0 if weights is None else weights[i, j]
             if weight <= 0:
                 continue
 
-            row = np.zeros(count, dtype=float)
+            # Each equation is: correction[j] - correction[i] = pair shift.
+            row = np.zeros(frame_count, dtype=float)
             row[i] = -weight
             row[j] = weight
-            rows.append(row)
-            values.append(relative_shift_array[i, j] * weight)
+            equation_rows.append(row)
+            measured_shifts.append(relative_shift_array[i, j] * weight)
 
-    if not rows:
+    if not equation_rows:
         raise ValueError("no pairwise shifts are available")
 
-    matrix = np.stack(rows)
-    targets = np.stack(values)
-    correction_shifts = np.zeros((count, 2), dtype=float)
+    matrix = np.stack(equation_rows)
+    targets = np.stack(measured_shifts)
+    correction_shifts = np.zeros((frame_count, 2), dtype=float)
 
     for axis in range(2):
         correction_shifts[:, axis] = np.linalg.lstsq(
-            matrix,
-            targets[:, axis],
-            rcond=None,
+            matrix, targets[:, axis], rcond=None
         )[0]
 
     return correction_shifts - correction_shifts[reference_index]
 
 
-def apply_shifts(images, shifts, order=1, mode="constant", cval=0.0):
-    """Apply correction shifts to every image in a stack."""
-    return np.stack(
-        [
-            shift_image(image, shift=shift, order=order, mode=mode, cval=cval)
-            for image, shift in zip(images, shifts)
-        ]
-    )
-
-
-def drift_correct(
+def calculate_drift(
     images,
     sigma=3,
     crop_size=None,
     upsample_factor=10,
+    max_workers=None,
+    chunk_size=32,
+    max_distance=None,
     reference_index=0,
-    order=1,
-    mode="constant",
-    cval=0.0,
 ):
-    """Correct drift in an image stack.
+    """Estimate correction shifts for an image stack.
 
     Shifts use NumPy image-axis order, (y, x). The returned shifts are the
     correction shifts applied to each image, relative to reference_index.
@@ -147,18 +233,72 @@ def drift_correct(
     shift_matrix, weights = relative_shifts(
         registration_images,
         upsample_factor=upsample_factor,
+        max_workers=max_workers,
+        chunk_size=chunk_size,
+        max_distance=max_distance,
     )
     correction_shifts = absolute_shifts(
         shift_matrix,
         weights=weights,
         reference_index=reference_index,
     )
-    corrected_images = apply_shifts(
-        stack,
-        correction_shifts,
-        order=order,
-        mode=mode,
-        cval=cval,
-    )
 
-    return corrected_images, correction_shifts
+    return correction_shifts
+
+
+def shift_canvas(image_shape, shifts):
+    """Return the canvas shape and offset needed to apply the shifts."""
+    shifts = np.round(np.asarray(shifts, dtype=float), decimals=6)
+
+    min_shift = np.floor(shifts.min(axis=0)).astype(int)
+    max_shift = np.ceil(shifts.max(axis=0)).astype(int)
+
+    padding_before = np.maximum(-min_shift, 0)
+    padding_after = np.maximum(max_shift, 0)
+
+    canvas_shape = np.asarray(image_shape, dtype=int) + padding_before + padding_after
+    offset = padding_before
+
+    return tuple(canvas_shape), tuple(offset)
+
+
+def image_to_canvas(image, canvas_shape, offset, cval=0.0):
+    """Copy an image into a larger canvas."""
+    canvas = np.full(canvas_shape, cval, dtype=image.dtype)
+
+    top, left = offset
+    height, width = image.shape
+    canvas[top : top + height, left : left + width] = image
+
+    return canvas
+
+
+def apply_shifts(images, shifts, cval=0.0, expand=False):
+    """Apply correction shifts to an image stack."""
+    images = np.asarray(images)
+    shifts = np.asarray(shifts, dtype=float)
+
+    if images.ndim != 3:
+        raise ValueError("images must be a 3D stack")
+
+    if shifts.shape != (images.shape[0], 2):
+        raise ValueError("images and shifts must have the same length")
+
+    if expand:
+        canvas_shape, offset = shift_canvas(images.shape[1:], shifts)
+        corrected_images = np.empty(
+            (images.shape[0], *canvas_shape), dtype=images.dtype
+        )
+
+        for index, (image, shift) in enumerate(zip(images, shifts)):
+            canvas_image = image_to_canvas(image, canvas_shape, offset, cval=cval)
+            corrected_images[index] = scipy_shift(canvas_image, shift=shift, cval=cval)
+
+        return corrected_images
+
+    return np.stack(
+        [
+            scipy_shift(image, shift=shift, cval=cval)
+            for image, shift in zip(images, shifts)
+        ]
+    )

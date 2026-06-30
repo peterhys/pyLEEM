@@ -95,9 +95,10 @@ def test_get_processed_image(xas_readers):
             message="Could not determine RMS error",
             category=UserWarning,
         )
-        analyzer.drift_correct()
-    assert hasattr(analyzer, "corrected_images")
-    assert np.array_equal(analyzer.get_processed_image(1), analyzer.corrected_images[1])
+        correction_shifts = analyzer.calculate_drift()
+    assert hasattr(analyzer, "correction_shifts")
+    assert correction_shifts is analyzer.correction_shifts
+    assert analyzer.get_processed_image(1).shape == analyzer.get_raw_image(1).shape
 
 
 def test_xas_plot_intensity(xas_readers):
