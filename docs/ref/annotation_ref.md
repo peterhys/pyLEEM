@@ -14,7 +14,6 @@ designed as class mixins that compose with `Analyzer` subclasses through
 
 ## annotation.scalebar
 
-Use `ScaleBarMixin` to draw a FOV-calibrated scale bar on image axes.
 
 ```{eval-rst}
 .. automodule:: pyleem.annotation.scalebar
