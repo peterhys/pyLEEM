@@ -1,6 +1,6 @@
 from pyleem.metadata import (
     convert_win_filetime,
-    get_metadata,
+    get_metadata_fixed_header,
     parse_leem_data,
     is_tag_in_range,
 )
@@ -16,9 +16,9 @@ def test_convert_win_filetime():
     assert convert_win_filetime(win_time) == "2025/01/01 05:20:00.000000"
 
 
-def test_get_metadata(metadata_bytes, header_parsed):
+def test_get_metadata_fixed_header(metadata_bytes, header_parsed):
     """Test metadata extraction from bytes."""
-    metadata = get_metadata(metadata_bytes)
+    metadata = get_metadata_fixed_header(metadata_bytes)
 
     for key in header_parsed.keys():
         assert metadata[key][0] == header_parsed[key]
@@ -27,6 +27,7 @@ def test_get_metadata(metadata_bytes, header_parsed):
     assert metadata["ImageTime"][0] == "2026/01/01 00:00:00.000000"
     assert isinstance(metadata["ImageTime"][0], str)
     assert isinstance(metadata["TimeStamp"][0], datetime)
+    assert metadata["FOV"] == ("XPS", "um")
 
     # Verify all entries are tuples
     for value in metadata.values():
@@ -97,9 +98,10 @@ def test_parse_special_tags():
     assert leemdata["Image Title"][0] == "Test Image"
 
     # FOV tag
-    data = b"\x6eFOV5\x00" + struct.pack("<f", 7.5)
+    data = b"\x6e10um\x00" + struct.pack("<f", 7.5)
     leemdata = parse_leem_data(data)
-    assert leemdata["FOV"][0] == "FOV5"
+    assert leemdata["FOV"][0] == 10.0
+    assert leemdata["FOV"][1] == "um"
     assert leemdata["Cal. FOV"][0] == pytest.approx(7.5)
 
     # Data tag (Micrometers)
@@ -110,11 +112,12 @@ def test_parse_special_tags():
 
 
 def test_parse_cp1252_metadata():
-    """Test metadat Windows cp1252/Latin-1 strings decoding."""
-    # FOV tag (0x6e) carrying a micro sign: b"10\xb5m" is "10um" in cp1252.
+    """Test metadata Windows cp1252/Latin-1 strings decoding."""
+    # FOV tag (0x6e) carrying a cp1252 micro sign.
     data = b"\x6e10\xb5m\x00" + struct.pack("<f", 7.5)
     leemdata = parse_leem_data(data)
-    assert leemdata["FOV"][0] == b"10\xb5m".decode("cp1252")
+    assert leemdata["FOV"][0] == 10.0
+    assert leemdata["FOV"][1] == "um"
 
     # Gauge tag (0x6a) with a micro sign in the unit (e.g. "uA").
     data = b"\x6aEmission\x00\xb5A\x00" + struct.pack("<f", 1.5)
@@ -168,7 +171,7 @@ def test_metadata_with_nan_values(header_bytes):
     img_header = b"\x02Test\x00" + struct.pack("<f", float("nan")) + b"\xff\xff"
 
     metadata_bytes = header_bytes + empty_1 + marker + empty_2 + img_header
-    metadata = get_metadata(metadata_bytes)
+    metadata = get_metadata_fixed_header(metadata_bytes)
 
     assert "Test" in metadata
     assert np.isnan(metadata["Test"][0])

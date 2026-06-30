@@ -2,7 +2,16 @@ import pytest
 import struct
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
+from pyleem.reader import UViewReader, read_files
 from pyleem.roi import LineROI
+
+
+@pytest.fixture(autouse=True)
+def close_matplotlib_figures():
+    """Close matplotlib figures after every test."""
+    yield
+    plt.close("all")
 
 
 def set_start_voltage(metadata_bytes, voltage):
@@ -157,6 +166,26 @@ def xps_raw_file(tmp_path, metadata_bytes, xps_array):
 
 
 @pytest.fixture
+def xps_reader(xps_raw_file):
+    """Create an XPS reader."""
+    reader = UViewReader(xps_raw_file)
+    reader.update_metadata({"Incident Voltage": (400, "eV")})
+    return reader
+
+
+@pytest.fixture
+def raw_reader_factory(tmp_path, metadata_bytes):
+    """Create raw files and return readers."""
+
+    def create_reader(name, image):
+        path = tmp_path / name
+        path.write_bytes(metadata_bytes + b"\xff" * 2000 + image.tobytes())
+        return UViewReader(path)
+
+    return create_reader
+
+
+@pytest.fixture
 def noisy_raw_file(tmp_path, metadata_bytes, noisy_array):
     """Create a single low-signal noise raw file."""
     raw_file = tmp_path / "test_noisy.dat"
@@ -174,13 +203,9 @@ def sees_raw_file(tmp_path, metadata_bytes, sees_array):
 
 
 @pytest.fixture
-def desp_raw_file(tmp_path, metadata_bytes):
-    """Create a single DESP raw file with a circular pattern."""
-    image = np.zeros((256, 128), dtype=np.uint16)
-    cv2.circle(image, (64, 128), 40, 1000, -1)
-    desp_file = tmp_path / "test_desp.dat"
-    desp_file.write_bytes(metadata_bytes + b"\xff" * 2000 + image.tobytes())
-    return desp_file
+def sees_reader(sees_raw_file):
+    """Create a SEES reader."""
+    return UViewReader(sees_raw_file)
 
 
 @pytest.fixture
@@ -211,6 +236,20 @@ def xps_multiple_raw_files(tmp_path, metadata_bytes):
 
 
 @pytest.fixture
+def xps_readers(xps_multiple_raw_files):
+    """Create XPS readers from multiple raw files."""
+    return read_files(
+        xps_multiple_raw_files,
+        UViewReader,
+        metadata_list=[
+            {"Incident Voltage": (400, "eV")},
+            {"Incident Voltage": (400, "eV")},
+            {"Incident Voltage": (400, "eV")},
+        ],
+    )
+
+
+@pytest.fixture
 def sees_multiple_raw_files(tmp_path, metadata_bytes):
     """Create multiple SEES raw files with different start voltages."""
     files = []
@@ -226,6 +265,12 @@ def sees_multiple_raw_files(tmp_path, metadata_bytes):
         )
         files.append(sees_file)
     return files
+
+
+@pytest.fixture
+def sees_readers(sees_multiple_raw_files):
+    """Create SEES readers from multiple raw files."""
+    return read_files(sees_multiple_raw_files, UViewReader)
 
 
 @pytest.fixture
@@ -253,6 +298,12 @@ def desp_files(tmp_path, metadata_bytes, desp_radius_to_energy_func):
 
 
 @pytest.fixture
+def desp_readers(desp_files):
+    """Create DESP readers from multiple raw files."""
+    return read_files(desp_files, UViewReader)
+
+
+@pytest.fixture
 def roi():
     """Create an uncalibrated LineROI (vertical line, 128 pixels)."""
     return LineROI(src=(0, 0), dst=(0, 127), linewidth=1)
@@ -263,7 +314,7 @@ def roi_file(tmp_path, roi):
     """Save the conftest roi fixture to a temporary ImageJ ROI file."""
 
     roi_path = tmp_path / "test.roi"
-    roi.to_roi_object().tofile(roi_path)
+    roi.tofile(roi_path)
     return roi_path
 
 
@@ -277,3 +328,15 @@ def pixel_per_ev():
 def peak_shift():
     """Create a peak shift function."""
     return 0
+
+
+# Config content
+
+
+@pytest.fixture
+def config_file(tmp_path, config_content):
+    """Write config_content to a TOML file."""
+
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(config_content.strip(), encoding="utf-8")
+    return config_path

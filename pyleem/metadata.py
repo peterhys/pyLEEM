@@ -24,7 +24,7 @@ def convert_win_filetime(timestamp):
     return dt.strftime("%Y/%m/%d %H:%M:%S.%f")
 
 
-def get_metadata(metabytes):
+def get_metadata_fixed_header(metabytes):
     """Extract and parse metadata from UView .dat file header.
 
     :param bytes metabytes: Raw metadata bytes from file header.
@@ -213,8 +213,15 @@ def parse_leem_data(data):
         elif is_tag_in_range(tag, (110, 110)):
             # FOV
             fov, data = data.split(b"\x00", maxsplit=1)
-            leemdata["FOV"] = (fov.decode("cp1252", errors="replace"), None)
+            fov_text = fov.decode("cp1252", errors="replace")
+            mm_suffix = b"\xb5m".decode("cp1252")
 
+            if fov_text.endswith("um") or fov_text.endswith(mm_suffix):
+                fov = float(fov_text.removesuffix("um").removesuffix(mm_suffix))
+            else:
+                fov = fov_text
+
+            leemdata["FOV"] = (fov, "um")
             cal_fov = struct.unpack(f"<f", data[:4])[0]
             leemdata["Cal. FOV"] = (cal_fov, None)
             data = data[4:]

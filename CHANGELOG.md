@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [Unreleased]
+
+Improve the repository architecture and simplify the API. Breaking changes included. See [design documentation](https://peterhys.github.io/pyLEEM/design.html) for details.
+
+## Changed
+
+- Reader class now takes care of raw file interaction (image and metadata).
+- Analyzer now takes care of domain specific analysis.
+- Analyzer class is rewritten as a base class.
+- ROI inputs are now explicitly defined instead of an ROI object.
+- Config class now takes care workflow configurations.
+- Updated domain specific analyzers. 
+- Update design documentation and add examples to README.md.
+
+## Added
+
+- ReaderGroup class that adds time interval to the metadata.
+- Analyzer workflow now more explicit for reproducibility.
+- Workflow class now can read, run, and export the configuration file and content.
+- Add AreaROIs such as circle, rectangle, and ellipse.
+- Add XASAnalyzer for X-ray absorption image stack analysis.
+
+## Removed
+
+- Remove `AnalyzerGroup` class and associated domain specific analyzers.
+- Remove `StitchAnalyzer` class and moved stitch functionality to the
+  spectra analyzer.
+
 ## [0.2.1]
 
 ### Added

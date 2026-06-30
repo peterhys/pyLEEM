@@ -40,7 +40,7 @@ docs = [
 Repository = "https://github.com/peterhys/PyLEEM"
 
 [tool.setuptools]
-packages = ["pyleem", "pyleem.analysis"]
+packages = ["pyleem", "pyleem.analysis", "pyleem.operation", "pyleem.annotation"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
