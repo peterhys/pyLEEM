@@ -145,4 +145,8 @@ peak_shift = 3.72
 .. automodule:: pyleem.config
    :members:
    :show-inheritance:
+
+.. automodule:: pyleem.workflow
+   :members:
+   :show-inheritance:
 ```
