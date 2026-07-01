@@ -1,5 +1,5 @@
 ---
-title: "pyLEEM: A Python platform for dynamic Low-Energy Electron Microscopy data analysis"
+title: "pyLEEM: A Python package for dynamic Low-Energy Electron Microscopy data analysis"
 tags:
   - Python
   - electron microscopy
@@ -30,7 +30,8 @@ bibliography: paper.bib
 
 # Summary
 
-`pyLEEM` is a Python platform designed to streamline the analysis of Low-Energy Electron Microscopy (LEEM) experimental data. The package provides a unified framework for reading raw data files, performing energy calibrations, extracting spectroscopy profiles, and conducting domain-specific analyses, including X-ray photoelectron spectroscopy (XPS) stitching, secondary electron emission spectroscopy (SEES) energy correction, and diffuse electron scattering pattern (DESP) characterization. Through a modular and extensible core architecture combined with batch processing capabilities, `pyLEEM` enables researchers to develop reproducible, automated analysis workflows for large-scale datasets. Based on the `pyLEEM` platform, we developed `pyLEEM-GUI`, a graphical user interface for interactive inspection and analysis of LEEM experimental data.
+`pyLEEM` is a Python package designed to streamline the analysis of Low-Energy Electron Microscopy (LEEM) experimental data. The package provides a unified framework for reading raw data files, performing energy calibrations, extracting spectroscopy profiles, and conducting domain-specific analyses, including X-ray photoelectron spectroscopy (XPS) stitching, X-ray absorption spectroscopy (XAS), secondary electron emission spectroscopy (SEES) energy correction, and diffuse electron scattering pattern (DESP) characterization. Through a modular and extensible core architecture combined with batch processing capabilities, `pyLEEM` enables researchers to develop reproducible, automated analysis workflows for large-scale datasets. 
+
 
 # Statement of Need
 
@@ -40,23 +41,23 @@ These dynamic measurements generate large, multidimensional datasets that requir
 
 # State of the field
 
-Existing tools developed for LEEM analysis remain limited and are often highly customized and domain-specific [@DeJong2020jun; @Grady2018feb]. As a result, many LEEM datasets are still analyzed using general-purpose image-analysis tools such as ImageJ [@Schneider2012jul] for image and profile extraction, together with custom scripts for data analysis, post processing, and conversion into target formats for downstream domain-specific tools. These workflows are often non-trivial, error-prone, and difficult to reproduce. In addition, existing LEEM-related tools and ad hoc workflows do not provide the backend infrastructure needed for automated analysis, large dynamic datasets, or user-defined analysis modules.
-
- Therefore, we developed `pyLEEM` as a new platform rather than extending existing projects. `pyLEEM` is designed first as a headless, scriptable Python library, with `pyLEEM-GUI` built on top of the same backend for interactive graphical use. This separation allows the same analysis routines to be used in automated batch workflows, reproducible scripts, and graphical user sessions.
+Existing tools developed for LEEM analysis remain limited and are often highly customized and domain-specific [@DeJong2020jun; @Grady2018feb]. As a result, many LEEM datasets are still analyzed using general-purpose image-analysis tools such as ImageJ [@Schneider2012jul] for image and profile extraction, together with custom scripts for data analysis, post processing, and conversion into target formats for downstream domain-specific tools. These workflows are often non-trivial, error-prone, and difficult to reproduce. In addition, existing LEEM-related tools and ad hoc workflows do not provide the backend infrastructure needed for automated analysis, large dynamic datasets, or user-defined analysis modules. Therefore, we developed `pyLEEM` as a new package rather than extending existing projects.
  
 # Software design
 
-`pyLEEM` is designed as a modular and extensible Python platform for LEEM-family data analysis. The key design trade-off was to create a reusable backend API, which adds upfront abstraction but makes `pyLEEM` easier to test, maintain, extend, and use in reproducible headless workflows. The platform separates the workflow into three main layers: data input/output and metadata extraction, image and profile processing, and domain-specific analysis. This separation supports long-term maintainability by allowing input/output, calibration, image processing and analysis operations to be developed, tested, and updated independently. The extensible structure also allows users and facility staff to implement custom workflows for new file formats, image-processing routines, and domain-specific analysis needs. The core `pyLEEM` library is intentionally separated from the graphical user interface, so that analysis routines remain readable, testable, and usable outside interactive sessions. This backend-first design enables large-scale batch processing through scripts, notebooks, and automated workflows.
+`pyLEEM` is designed as a modular and extensible Python package for LEEM-family data analysis. The key design trade-off was to create a reusable backend API, which adds upfront abstraction but makes `pyLEEM` easier to test, maintain, extend, and use in reproducible headless workflows. The package separates the workflow into three main layers: data input/output and metadata extraction, image and profile processing, and domain-specific analysis. This separation supports long-term maintainability by allowing input/output, calibration, image processing and analysis operations to be developed, tested, and updated independently. The extensible structure also allows users and facility staff to implement custom workflows for new file formats, image-processing routines, and domain-specific analysis needs. The core `pyLEEM` library is intentionally separated from the graphical user interface, so that analysis routines remain readable, testable, and usable outside interactive sessions. This backend-first design enables large-scale batch processing through scripts, notebooks, and automated workflows.
 
-A second design goal is workflow readability and reproducibility. Calibration settings and analysis parameters are stored in human-readable configuration files and can be applied consistently across workflow steps. In `pyLEEM-GUI`, image-processing, calibration, annotation, and analysis steps can be recorded, saved, reloaded, and shared. This allows facility staff and tool managers to distribute validated analysis workflows directly to users, while users can reproduce the same sequence of operations on related datasets or future experiments.
+A second design goal is workflow readability and reproducibility. Domain specific workflow can be saved as a human-readable configuration file, either as a analysis template or store analysis results. The design allows facility staff and tool managers to distribute validated analysis workflows directly to users, while users can reproduce the same sequence of operations on related datasets or future experiments.
 
 # Research impact statement
 
-`pyLEEM` has supported both user-facility data analysis and method development. For the core developers, the platform enables rapid development, testing, and validation of new workflows and analysis algorithms, including DESP calibration and characterization. More broadly, `pyLEEM` and `pyLEEM-GUI` were developed at the Center for Functional Nanomaterials (CFN), a U.S. Department of Energy Office of Science user facility at Brookhaven National Laboratory. As a user facility, the CFN serves a broad community of visiting researchers, and `pyLEEM` has supported and continues to support users' data analysis at both the CFN and the National Synchrotron Light Source II (NSLS-II) user facilities. 
+`pyLEEM` has supported both user-facility data analysis and method development. For the core developers, the package enables rapid development, testing, and validation of new workflows and analysis algorithms, including DESP calibration and characterization. More broadly, `pyLEEM` were developed at the Center for Functional Nanomaterials (CFN), a U.S. Department of Energy Office of Science user facility at Brookhaven National Laboratory. As a user facility, the CFN serves a broad community of visiting researchers, and `pyLEEM` has supported and continues to support users' data analysis at both the CFN and the National Synchrotron Light Source II (NSLS-II) user facilities. 
 
 # AI usage disclosure
 
-Generative AI tools were not used in the software creation, documentation and paper authoring for `pyLEEM`. Generative AI tools were used to assist with the prototyping of the interface for the `pyLEEM-GUI` package. The AI-assisted code was reviewed manually, and the authors remain responsible for the final software.
+Generative AI tools were not used in the software creation, documentation and paper authoring for `pyLEEM`. GPT-5.5 was used to review the codebase formatting. No AI-generated code was used in the development of the software.
+
+Generative AI tools were used to assist with the prototyping of the interface for the `pyLEEM-GUI` package. The AI-assisted code was reviewed manually, and the authors remain responsible for the final software.
 
 # Acknowledgements
 
