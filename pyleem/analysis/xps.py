@@ -61,6 +61,7 @@ def pseudo_voigt_fits(peak_constraints):
     The constraints are nested dictionaries with the following structure:
 
     Example::
+
         {
             "label": {
                 "param": {"value": value, "min": min, "max": max, "vary": vary}
@@ -331,8 +332,6 @@ class XPSCalibration(Analyzer):
         )
         delta_ev = np.diff(start_voltages)
 
-        bgs = []
-        results = []
         peak_results = []
 
         for index in self.indices:
@@ -349,9 +348,7 @@ class XPSCalibration(Analyzer):
                 fit_result["result"].best_values[f"{label}_center"]
                 for label in fit_result["peak_labels"]
             ]
-            results.append(fit_result["result"])
             peak_results.append(peaks)
-            bgs.append(fit_result["background"])
 
         if pixel_per_ev is None:
             # Average over the peaks (the peak splitting should remain the same)
@@ -407,9 +404,9 @@ class XPSAnalyzer(SpectraBase):
         :param int num_peaks: Number of peaks to fit.
         :param tuple baseline: Tuple (left, right) background intensities.
         :param float peak_prominence: Peak detection prominence fraction.
-        :param list peak_specs: Optional manual peak specifications.
+        :param dict peak_constraints: Optional manual peak constraints.
         :param tuple fit_range: Optional range to use for background and fitting.
-        :param list exclude_ranges: Optional ranges to exclude from fitting.
+        :param float smooth_sigma: Optional Gaussian smoothing sigma.
         :return: Fit result.
         :rtype: dict
         """
