@@ -288,9 +288,9 @@ class XPSCalibration(Analyzer):
         [reader]
         paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
         metadata = [
-            {"Incident Voltage" = [400, "eV"]},
-            {"Incident Voltage" = [400, "eV"]},
-            {"Incident Voltage" = [400, "eV"]},
+            {"Beam Energy" = [400, "eV"]},
+            {"Beam Energy" = [400, "eV"]},
+            {"Beam Energy" = [400, "eV"]},
         ]
 
         [task]
@@ -324,7 +324,7 @@ class XPSCalibration(Analyzer):
         """
 
         incident_voltage = np.array(
-            [self.get_metadata("Incident Voltage", index)[0] for index in self.indices]
+            [self.get_metadata("Beam Energy", index)[0] for index in self.indices]
         )
         start_voltages = np.array(
             [self.get_metadata("Start Voltage", index)[0] for index in self.indices]
@@ -433,7 +433,7 @@ class XPSAnalyzer(SpectraBase):
     def get_binding_energy(self, index):
         """Return the binding energy for a given index."""
         kinetic_energy = self.get_kinetic_energy(index)
-        incident_voltage = self.get_metadata("Incident Voltage", index)[0]
+        incident_voltage = self.get_metadata("Beam Energy", index)[0]
         return incident_voltage - kinetic_energy
 
     def plot_profile(self, index, ax=None, show_fit=False, **fit_kwargs):

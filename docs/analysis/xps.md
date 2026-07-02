@@ -7,7 +7,7 @@ provides the basic stitching profile analysis.
 
 {py:class}`~pyleem.analysis.xps.XPSCalibration` derives `pixel_per_ev` and
 `peak_shift` from a stack of readers with `"Start Voltage"` and
-`"Incident Voltage"` metadata. The calibration `analyze()` method uses XPS
+`"Beam Energy"` metadata. The calibration `analyze()` method uses XPS
 fitting methods that require baseline intensities, total number of peaks,
 reference peak index and energy value.
 
@@ -33,9 +33,9 @@ readers = read_files(
     ["xps_0.dat", "xps_1.dat", "xps_2.dat"],
     reader_cls=UViewReader,
     metadata_list=[
-        {"Incident Voltage": (400, "eV")},
-        {"Incident Voltage": (400, "eV")},
-        {"Incident Voltage": (400, "eV")},
+        {"Beam Energy": (400, "eV")},
+        {"Beam Energy": (400, "eV")},
+        {"Beam Energy": (400, "eV")},
     ],
 )
 roi = LineROI(src=(0, 0), dst=(0, 127), linewidth=1)

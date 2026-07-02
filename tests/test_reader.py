@@ -43,8 +43,8 @@ def test_reader_sort(tmp_path, metadata_bytes):
 
 def test_reader_update_metadata(reader):
     """Test reader update_metadata method."""
-    reader.update_metadata({"Incident Voltage": (400.0, "eV")})
-    assert reader.metadata["Incident Voltage"] == (400.0, "eV")
+    reader.update_metadata({"Beam Energy": (400.0, "eV")})
+    assert reader.metadata["Beam Energy"] == (400.0, "eV")
 
 
 def test_read_files_time_intervals(xps_multiple_raw_files):

@@ -98,7 +98,7 @@ workflow = Workflow(
     root=".",
     reader={
         "paths": ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"],
-        "metadata": {"Incident Voltage": [400, "eV"]},
+        "metadata": {"Beam Energy": [400, "eV"]},
     },
 )
 
@@ -129,7 +129,7 @@ analyzer = "XPSCalibration"
 
 [reader]
 paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
-metadata = {"Incident Voltage" = [400, "eV"]}
+metadata = {"Beam Energy" = [400, "eV"]}
 
 [roi]
 src = [0, 0]

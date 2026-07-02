@@ -92,9 +92,9 @@ readers = read_files(
     ["xps_0.dat", "xps_1.dat", "xps_2.dat"],
     UViewReader,
     metadata_list=[
-        {"Incident Voltage": (400, "eV")},
-        {"Incident Voltage": (400, "eV")},
-        {"Incident Voltage": (400, "eV")},
+        {"Beam Energy": (400, "eV")},
+        {"Beam Energy": (400, "eV")},
+        {"Beam Energy": (400, "eV")},
     ],
 )
 
