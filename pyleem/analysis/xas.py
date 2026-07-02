@@ -61,16 +61,16 @@ class XASAnalyzer(Analyzer):
         )
 
     def plot_intensity(self, ax=None):
-        """Plot ROI intensity vs. incident energy."""
+        """Plot ROI intensity vs. Beam Energy."""
         ax = ax or plt.gca()
 
         energy_range = [
-            self.get_metadata("Incident Energy", index)[0] for index in self.indices
+            self.get_metadata("Beam Energy", index)[0] for index in self.indices
         ]
         intensities = self.get_intensities()
 
         ax.plot(energy_range, intensities)
-        ax.set_xlabel("Incident Energy [eV]")
+        ax.set_xlabel("Beam Energy [eV]")
         ax.set_ylabel("Intensity")
 
         return ax

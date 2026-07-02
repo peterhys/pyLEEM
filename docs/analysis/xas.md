@@ -16,9 +16,9 @@ readers = read_files(
     ["xas_0.dat", "xas_1.dat", "xas_2.dat"],
     reader_cls=UViewReader,
     metadata_list=[
-        {"Incident Energy": (280.0, "eV")},
-        {"Incident Energy": (281.0, "eV")},
-        {"Incident Energy": (282.0, "eV")},
+        {"Beam Energy": (280.0, "eV")},
+        {"Beam Energy": (281.0, "eV")},
+        {"Beam Energy": (282.0, "eV")},
     ],
 )
 roi = RectROI(top=20, left=30, bottom=80, right=90)
