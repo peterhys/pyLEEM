@@ -27,7 +27,7 @@ def test_get_metadata_fixed_header(metadata_bytes, header_parsed):
     assert metadata["ImageTime"][0] == "2026/01/01 00:00:00.000000"
     assert isinstance(metadata["ImageTime"][0], str)
     assert isinstance(metadata["TimeStamp"][0], datetime)
-    assert metadata["FOV"] == ("XPS", "um")
+    assert metadata["FOV"] == ("XPS", None)
 
     # Verify all entries are tuples
     for value in metadata.values():
