@@ -2,15 +2,13 @@
 title: "pyLEEM: A Python package for dynamic Low-Energy Electron Microscopy data analysis"
 tags:
   - Python
-  - electron microscopy
-  - LEEM
-  - XPS
-  - spectroscopy
+  - Low-Energy Electron Microscopy
   - materials science
   - surface science
 authors:
   - name: Peter Sun
     orcid: 0000-0002-5241-100X
+    corresponding: true
     affiliation: 1
   - name: Shyam Patel
     orcid: 0000-0002-2449-7918
@@ -18,11 +16,11 @@ authors:
   - name: Chang-Yong Nam
     orcid: 0000-0002-9093-4063
     affiliation: 1
-  - name: Jerzy Sadowski
+  - name: Jerzy T. Sadowski
     orcid: 0000-0002-4365-7796
     affiliation: 1
 affiliations:
-  - name: Center for Functional Nanomaterials, Brookhaven National Laboratory
+  - name: Center for Functional Nanomaterials, Brookhaven National Laboratory, Upton, NY USA
     index: 1
 date: June 18, 2026
 bibliography: paper.bib
@@ -40,7 +38,7 @@ These dynamic measurements generate large, multidimensional datasets that requir
 
 # State of the field
 
-Existing tools developed for LEEM analysis remain limited and are often highly customized and domain-specific [@DeJong2020jun; @Grady2018feb]. As a result, many LEEM datasets are still analyzed using general-purpose image analysis tools such as ImageJ [@Schneider2012jul] for image and profile extraction, along with custom scripts for data analysis, post-processing, and conversion into target formats for downstream domain-specific tools. These workflows are often non-trivial, error-prone, and difficult to reproduce. In addition, existing LEEM-related tools and ad hoc workflows do not provide the backend infrastructure needed for automated analysis, large dynamic datasets, or user-defined analysis modules. Therefore, we developed `pyLEEM` as a new package rather than extending existing projects.
+Existing tools developed for LEEM analysis remain limited and are often highly customized and domain-specific [@DeJong2020jun; @Grady2018feb]. As a result, many LEEM datasets are still analyzed using general-purpose image analysis tools such as ImageJ [@Schneider2012jul] for image and profile extraction, along with non-trivial custom scripts for data analysis, post-processing, and conversion into target formats for downstream domain-specific tools. In addition, existing LEEM-related tools and ad hoc workflows do not provide the backend infrastructure needed for automated analysis, large dynamic datasets, or user-defined analysis modules. Therefore, we developed `pyLEEM` as a new package rather than extending existing projects.
  
 # Software design
 
@@ -54,7 +52,7 @@ A second design goal is workflow readability and reproducibility. Domain-specifi
 
 # AI usage disclosure
 
-Generative AI tools were not used in the software creation, documentation, and paper authoring for `pyLEEM`. GPT-5.5 was used to review the codebase formatting. No AI-generated code was used in the development of the software.
+Generative AI tools were not used in the software creation, documentation, and paper authoring for `pyLEEM`. GPT-5.5 was used solely to review the existing codebase, docstrings, and comments for errors, clarity, and consistency. The authors made all core design decisions and reviewed, edited, and validated every change, and take full responsibility for the accuracy and originality of the submitted materials.
 
 # Acknowledgements
 
