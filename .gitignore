@@ -135,6 +135,9 @@ data/*
 *.DS_Store
 *.dat
 .vscode/*.json
-/joss/paper_files
+joss/paper_files/
 *.html
-*.pdf
+
+# example
+example/
+!example.ipynb

@@ -79,7 +79,17 @@ reproducible input, parameters, and streamlined I/O.
 
 ## Examples
 
-Here we show some examples of its capabilities.
+For detailed examples, please refer to the
+[example notebook](https://github.com/peterhys/PyLEEM/blob/main/example.ipynb).
+
+The notebook uses the external example data repository. Clone it
+as `example/` next to the notebook:
+
+```bash
+git clone https://github.com/peterhys/pyLEEM-example.git example
+```
+
+Here we show some examples of pyLEEM's capabilities.
 
 ### XPS: binding energy calibration, peak fitting and stitching
 
@@ -92,9 +102,9 @@ readers = read_files(
     ["xps_0.dat", "xps_1.dat", "xps_2.dat"],
     UViewReader,
     metadata_list=[
-        {"Incident Voltage": (400, "eV")},
-        {"Incident Voltage": (400, "eV")},
-        {"Incident Voltage": (400, "eV")},
+        {"Beam Energy": (400, "eV")},
+        {"Beam Energy": (400, "eV")},
+        {"Beam Energy": (400, "eV")},
     ],
 )
 
@@ -115,7 +125,7 @@ analyzer = XPSAnalyzer(
     cal_result["peak_shift"],
 )
 
-fit_result, background = analyzer.fit(0, num_peaks=1, baseline=(200, 100))
+fit_result = analyzer.fit(0, num_peaks=1, baseline=(200, 100))
 
 # Automatically stitch profiles into a single spectrum
 stitched_energy, stitched_profile = analyzer.stitch_profiles([0, 1, 2])

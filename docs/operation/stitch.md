@@ -1,4 +1,4 @@
-# Sitch Spectra
+# Stitch Spectra
 
 Profile stitching utilities for combining multiple overlapping spectra into a
 single continuous profile.

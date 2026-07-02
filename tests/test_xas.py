@@ -44,7 +44,7 @@ def xas_readers(raw_reader_factory):
         for index, image in enumerate(images)
     ]
     for index, reader in enumerate(readers):
-        reader.update_metadata({"Incident Energy": (10 + index, "eV")})
+        reader.update_metadata({"Beam Energy": (10 + index, "eV")})
 
     return readers
 
@@ -95,14 +95,13 @@ def test_get_processed_image(xas_readers):
             message="Could not determine RMS error",
             category=UserWarning,
         )
-        correction_shifts = analyzer.calculate_drift()
+        analyzer.correct_drift()
     assert hasattr(analyzer, "correction_shifts")
-    assert correction_shifts is analyzer.correction_shifts
     assert analyzer.get_processed_image(1).shape == analyzer.get_raw_image(1).shape
 
 
 def test_xas_plot_intensity(xas_readers):
-    """Test XASAnalyzer plots ROI intensity by incident energy."""
+    """Test XASAnalyzer plots ROI intensity by Beam Energy."""
     roi = RectROI(top=0, left=0, bottom=256, right=64)
     analyzer = XASAnalyzer(
         xas_readers,
@@ -116,6 +115,6 @@ def test_xas_plot_intensity(xas_readers):
     assert returned is ax
     assert np.array_equal(line.get_xdata(), np.array([10.0, 11.0, 12.0, 13.0]))
     assert line.get_ydata() == pytest.approx([0.0, 1000.0, 0.0, 1000.0])
-    assert ax.get_xlabel() == "Incident Energy [eV]"
+    assert ax.get_xlabel() == "Beam Energy [eV]"
     assert ax.get_ylabel() == "Intensity"
     plt.close(fig)

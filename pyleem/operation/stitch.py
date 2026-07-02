@@ -6,7 +6,7 @@ import numpy as np
 def find_stitch_points(x_ranges, method="midpoint"):
     """Locate the stitch points between the ranges.
 
-    :param list abscissa_ranges: List of abscissa ranges.
+    :param list x_ranges: List of abscissa ranges.
     :param str method: Method to locate the stitch points.
     :return: List of stitch points.
     :rtype: list
@@ -18,7 +18,7 @@ def find_stitch_points(x_ranges, method="midpoint"):
         stitch_points = [r[0] for r in x_ranges[1:]]
     elif method == "midpoint":
         stitch_points = [
-            (x_ranges[i][0] + x_ranges[i + 1][1]) / 2 for i in range(len(x_ranges) - 1)
+            (x_ranges[i][1] + x_ranges[i + 1][0]) / 2 for i in range(len(x_ranges) - 1)
         ]
     else:
         raise ValueError(f"Invalid method: {method}")
@@ -29,7 +29,7 @@ def find_stitch_points(x_ranges, method="midpoint"):
 def stitch_profiles(x_array_list, y_array_list, mask_points):
     """Stitch profiles together based on mask points.
 
-    The x_arrays and y_arrays are assumed to be sorted.
+    Each x and y array is assumed to be sorted.
     Currently, if the abscissa of a profile lands exactly on a mask point,
     the point is included in the first profile and excluded from the second profile.
     For the last profile, the last mask point is included.
@@ -37,8 +37,8 @@ def stitch_profiles(x_array_list, y_array_list, mask_points):
     This can lead to an issue that at same x value, there
     are two different y values.
 
-    :param list x_arrays: List of x_arrays for each profile.
-    :param list y_arrays: List of y_arrays for each profile.
+    :param list x_array_list: List of x arrays for each profile.
+    :param list y_array_list: List of y arrays for each profile.
     :param list mask_points: List of mask points between profiles.
     :return: Stitched profile and abscissa.
     :rtype: tuple

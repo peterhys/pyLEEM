@@ -31,7 +31,7 @@ class Reader(ABC):
     def metadata(self):
         """Return metadata as dictionary in (value, unit) format.
 
-        The method force the child class to posses the _metadata attribute.
+        The method forces the child class to possess the _metadata attribute.
         """
         return self._metadata
 
@@ -125,7 +125,7 @@ def get_time_intervals(readers):
 def read_files(paths, reader_cls=UViewReader, metadata_list=None):
     """Read a list of files and add time intervals metadata.
 
-    Additional metadatas can be added to the readers with the
+    Additional metadata can be added to the readers with the
     metadata_list parameter.
 
     TimeInterval metadata, however, is added directly.

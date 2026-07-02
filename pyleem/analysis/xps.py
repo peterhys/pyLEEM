@@ -2,6 +2,7 @@ from lmfit.models import PseudoVoigtModel
 import numpy as np
 from pyleem.analyzer import Analyzer
 from pyleem.analysis.spectra import SpectraBase
+import scipy.ndimage
 import scipy.signal
 import matplotlib.pyplot as plt
 
@@ -51,124 +52,231 @@ def shirley_background(profile, base_diff, iterations=20, tol=1e-6):
     return bg
 
 
-def pseudo_voigt_fits(peaks, constraints=None):
+def pseudo_voigt_fits(peak_constraints):
     """Create composite pseudo-Voigt model for XPS peak fitting.
 
     Combines multiple pseudo-Voigt peaks (Gaussian-Lorentzian mixture)
     into single fitting model with optional parameter constraints.
 
-    :param list peaks: List of peak identifiers (e.g., ["C1s", "O1s"]).
-    :param dict constraints: Parameter constraints for lmfit.
+    The constraints are nested dictionaries with the following structure:
+
+    Example::
+
+        {
+            "label": {
+                "param": {"value": value, "min": min, "max": max, "vary": vary}
+            }
+        }
+
+    :param dict peak_constraints: Dictionary of peak constraints for lmfit.
     :return: Composite model and initial parameters.
     :rtype: tuple(lmfit.Model, lmfit.Parameters)
     """
 
-    model_list = []
-    constraints = constraints or {}
+    if not peak_constraints:
+        raise ValueError("peak_constraints must contain at least one peak")
 
-    for pk in peaks:
-        model_list.append(PseudoVoigtModel(prefix=pk + "_"))
+    model_list = []
+    for label in peak_constraints:
+        model_list.append(PseudoVoigtModel(prefix=label + "_"))
 
     model = np.sum(model_list)
 
-    # Preset parameters to 0 (can be overwritten by constraints)
-    for suffix in ["center", "amplitude", "sigma", "fraction"]:
-        for pk in peaks:
-            model.set_param_hint(pk + "_" + suffix, min=0)
+    default_hints = {
+        "center": {"min": 0},
+        "amplitude": {"min": 0},
+        "sigma": {"min": 0},
+        "fraction": {"min": 0, "max": 1},
+    }
 
-    for key, value in constraints.items():
-        model.set_param_hint(key, **value)
+    for label, constraints in peak_constraints.items():
+        for param_name, defaults in default_hints.items():
+            default_hint = defaults.copy()
+            default_hint.update(constraints.get(param_name, {}))
+            model.set_param_hint(label + "_" + param_name, **default_hint)
 
     params = model.make_params()
     return model, params
 
 
-def parameter_estimation(profile, num_peaks, peak_prominence=0.1):
+def parameter_estimation(
+    profile,
+    abscissa,
+    num_peaks,
+    peak_prominence=0.1,
+    smooth_sigma=None,
+):
     """Estimate initial parameters for XPS peak fitting.
 
     Uses scipy peak detection to locate peaks and estimate positions,
-    widths, and areas.
+    widths, and areas. The values are estimates for automatic fitting.
 
     :param ndarray profile: XPS intensity profile.
+    :param ndarray abscissa: XPS binding energy abscissa.
     :param int num_peaks: Expected number of peaks.
-    :param float peak_prominence: Minimum prominence (fraction of max).
+    :param float peak_prominence: Minimum prominence as a fraction of signal range.
+    :param int smooth_sigma: Optional Gaussian smoothing sigma for detection.
     :return: Peak centers, estimated widths, and areas.
     :rtype: tuple(ndarray, ndarray, ndarray)
     """
-    # Find peaks
-    prominence = max(profile) * peak_prominence
-    peaks, _ = scipy.signal.find_peaks(profile, prominence=prominence)
 
-    while len(peaks) > num_peaks:
-        prominence = prominence * 1.5
-        peaks, _ = scipy.signal.find_peaks(profile, prominence=prominence)
+    if num_peaks < 1:
+        raise ValueError("num_peaks must be at least 1")
+
+    profile = np.asarray(profile)
+
+    if smooth_sigma is not None:
+        smoothed_profile = scipy.ndimage.gaussian_filter1d(profile, smooth_sigma)
+    else:
+        smoothed_profile = profile
+    prominence = peak_prominence * np.ptp(smoothed_profile)
+    peaks, _ = scipy.signal.find_peaks(smoothed_profile, prominence=prominence)
 
     # Find peak widths
     widths, width_heights, left_ips, right_ips = scipy.signal.peak_widths(
         profile, peaks, rel_height=0.5
     )
 
-    sigmas = np.array(widths) / 2
-    # Peak area (by summation)
-    peak_areas = np.empty(len(peaks))
-    for i, p in enumerate(peaks):
-        peak_areas[i] = profile[
-            left_ips[i].astype(int) : right_ips[i].astype(int)
-        ].sum()
+    # skip the peak that is too narrow (needs to be larger than 1 pixel)
+    valid = widths >= 2
+    peaks = peaks[valid]
+    widths = widths[valid]
+    left_ips = left_ips[valid]
+    right_ips = right_ips[valid]
 
+    # if no peaks are found, would raise an error as well because num_peaks
+    # is required to be at least 1.
     if len(peaks) < num_peaks:
-        if len(peaks) == 1:
-            peak = peaks[0]
-            peaks = np.array([peak - 0.1 * sigmas[0], peak + 0.1 * sigmas[0]])
-            sigmas = np.array([sigmas[0], sigmas[0]])
-            peak_areas = np.array([peak_areas[0] / 2, peak_areas[0] / 2])
+        raise ValueError(f"found {len(peaks)} peaks, but expected {num_peaks}")
 
-    return peaks, sigmas, peak_areas
+    abscissa_per_pixel = np.abs(np.diff(abscissa)).mean()
+    sigmas = widths / 2 * abscissa_per_pixel
+
+    # Here we first calculate the FWHM area and then estimate the full area
+    # with a correction factor of 1.3176 (rough estimate)
+    # This is assuming a 0.5 fraction of Gaussian and 0.5 fraction of Lorentzian.
+    peak_areas = np.empty(len(peaks))
+    for i, peak in enumerate(peaks):
+        left = max(0, int(np.floor(left_ips[i])))
+        right = min(len(profile), int(np.ceil(right_ips[i])))
+
+        peak_areas[i] = profile[left:right].sum() * abscissa_per_pixel * 1.3176
+
+    return abscissa[peaks], sigmas, peak_areas
 
 
-def parameter_constraint(profile, num_peaks, peak_prominence=0.1):
+def parameter_constraint(
+    profile, abscissa, num_peaks, peak_prominence=0.1, smooth_sigma=None
+):
     """Create parameter constraints dictionary for XPS fitting.
 
     :param ndarray profile: XPS intensity profile.
     :param int num_peaks: Number of peaks to fit.
-    :param float peak_prominence: Minimum prominence for detection.
+    :param float peak_prominence: Minimum prominence as a fraction of signal range.
+    :param float smooth_sigma: Optional Gaussian smoothing sigma for detection.
     :return: Constraints dictionary for lmfit.
     :rtype: dict
     """
 
     centers, sigmas, peak_areas = parameter_estimation(
-        profile, num_peaks, peak_prominence
+        profile, abscissa, num_peaks, peak_prominence, smooth_sigma=smooth_sigma
     )
 
     constr = {}
     for i in range(1, num_peaks + 1):
-        constr[f"p{i}_center"] = {"value": centers[i - 1]}
-        constr[f"p{i}_amplitude"] = {"value": peak_areas[i - 1]}
-        constr[f"p{i}_sigma"] = {"value": sigmas[i - 1]}
+        constr[f"p{i}"] = {
+            "center": {"value": centers[i - 1]},
+            "amplitude": {"value": peak_areas[i - 1]},
+            "sigma": {"value": sigmas[i - 1]},
+        }
     return constr
 
 
-def fit_xps(profile, abscissa, baseline, peak_labels, constraints):
-    """Fit XPS spectrum with Shirley background and pseudo-Voigt peaks.
-
-    :param ndarray profile: XPS intensity profile.
-    :param ndarray abscissa: X-axis values (pixels or energy).
-    :param tuple baseline: Tuple (left_baseline, right_baseline) intensities.
-    :param list peak_labels: List of peak label strings.
-    :param dict constraints: Parameter constraints from parameter_constraint().
-    :return: Fit result and Shirley background.
-    :rtype: tuple(lmfit.ModelResult, ndarray)
-    """
+def xps_background(profile, baseline=None, baseline_average=10):
+    """Calculate the Shirley background with baseline offset."""
+    if baseline is None:
+        baseline = [
+            profile[:baseline_average].mean(),
+            profile[-baseline_average:].mean(),
+        ]
 
     bl_left, bl_right = baseline
-    # Background subtraction
-    bg = shirley_background(profile, bl_left - bl_right) + bl_right
-    sub_profile = profile - bg
+    return shirley_background(profile, bl_left - bl_right) + bl_right
 
-    model, param = pseudo_voigt_fits(peak_labels, constraints)
 
-    result = model.fit(sub_profile, x=abscissa, params=param)
-    return result, bg
+def fit_range_mask(abscissa, fit_range=None):
+    """Return a boolean mask for a fit range.
+
+    The fit range is a tuple of (left, right) values.
+    """
+    abscissa = np.asarray(abscissa)
+
+    if fit_range is None:
+        return np.ones(abscissa.shape, dtype=bool)
+
+    low, high = sorted(fit_range)
+    return (abscissa >= low) & (abscissa <= high)
+
+
+def fit_xps(
+    profile,
+    abscissa,
+    baseline=None,
+    baseline_average=10,
+    num_peaks=None,
+    peak_prominence=0.1,
+    peak_constraints=None,
+    fit_range=None,
+    smooth_sigma=None,
+):
+    """Fit an XPS profile with automatic or manual peak constraints.
+
+    If peak_constraints is provided, those manual constraints define the peaks.
+    Otherwise, num_peaks controls automatic detection on the
+    background-subtracted signal. fit_range selects the region used for the
+    Shirley background.
+    """
+    profile = np.asarray(profile)
+    abscissa = np.asarray(abscissa)
+
+    if profile.shape != abscissa.shape:
+        raise ValueError("profile and abscissa must have the same shape")
+
+    if peak_constraints is not None and num_peaks is not None:
+        raise ValueError("provide either peak_constraints or num_peaks, not both")
+
+    if peak_constraints is None and num_peaks is None:
+        raise ValueError("provide peak_constraints or num_peaks")
+
+    range_mask = fit_range_mask(abscissa, fit_range=fit_range)
+
+    range_profile = profile[range_mask]
+    range_abscissa = abscissa[range_mask]
+    background = xps_background(range_profile, baseline, baseline_average)
+    sub_profile = range_profile - background
+
+    if peak_constraints is None:
+        peak_constraints = parameter_constraint(
+            sub_profile,
+            range_abscissa,
+            num_peaks,
+            peak_prominence,
+            smooth_sigma=smooth_sigma,
+        )
+
+    model, params = pseudo_voigt_fits(peak_constraints)
+    result = model.fit(sub_profile, x=range_abscissa, params=params)
+
+    return {
+        "range_mask": range_mask,
+        "range_profile": range_profile,
+        "range_abscissa": range_abscissa,
+        "background": background,
+        "sub_profile": sub_profile,
+        "peak_constraints": peak_constraints,
+        "peak_labels": list(peak_constraints.keys()),
+        "result": result,
+    }
 
 
 class XPSCalibration(Analyzer):
@@ -181,9 +289,9 @@ class XPSCalibration(Analyzer):
         [reader]
         paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
         metadata = [
-            {"Incident Voltage" = [400, "eV"]},
-            {"Incident Voltage" = [400, "eV"]},
-            {"Incident Voltage" = [400, "eV"]},
+            {"Beam Energy" = [400, "eV"]},
+            {"Beam Energy" = [400, "eV"]},
+            {"Beam Energy" = [400, "eV"]},
         ]
 
         [task]
@@ -201,11 +309,11 @@ class XPSCalibration(Analyzer):
         self,
         num_peaks,
         baselines,
-        peak_prominence=0.1,
         pixel_per_ev=None,
         peak_shift=None,
         ref_index=None,
         ref_value=None,
+        **fit_kwargs,
     ):
         """Analyze XPS spectrum with background subtraction.
 
@@ -217,29 +325,30 @@ class XPSCalibration(Analyzer):
         """
 
         incident_voltage = np.array(
-            [self.get_metadata("Incident Voltage", index)[0] for index in self.indices]
+            [self.get_metadata("Beam Energy", index)[0] for index in self.indices]
         )
         start_voltages = np.array(
             [self.get_metadata("Start Voltage", index)[0] for index in self.indices]
         )
         delta_ev = np.diff(start_voltages)
 
-        bgs = []
-        results = []
         peak_results = []
 
         for index in self.indices:
             profile = self.get_profile(index)
             pixel = self.get_pixel(index)
-            constraints = parameter_constraint(profile, num_peaks, peak_prominence)
-            peak_labels = [f"p{j}" for j in range(1, num_peaks + 1)]
-            result, bg = fit_xps(
-                profile, pixel, baselines[index], peak_labels, constraints
+            fit_result = fit_xps(
+                profile,
+                pixel,
+                num_peaks=num_peaks,
+                baseline=baselines[index],
+                **fit_kwargs,
             )
-            peaks = [v for k, v in result.best_values.items() if "_center" in k]
-            results.append(result)
+            peaks = [
+                fit_result["result"].best_values[f"{label}_center"]
+                for label in fit_result["peak_labels"]
+            ]
             peak_results.append(peaks)
-            bgs.append(bg)
 
         if pixel_per_ev is None:
             # Average over the peaks (the peak splitting should remain the same)
@@ -280,39 +389,51 @@ class XPSAnalyzer(SpectraBase):
             peak_shift=peak_shift,
         )
 
-    def fit(self, index, num_peaks, baseline, peak_prominence=0.1):
+    def fit(
+        self,
+        index,
+        num_peaks=None,
+        baseline=None,
+        peak_prominence=0.1,
+        peak_constraints=None,
+        fit_range=None,
+        smooth_sigma=None,
+    ):
         """Fit XPS spectrum with background subtraction.
 
         :param int num_peaks: Number of peaks to fit.
         :param tuple baseline: Tuple (left, right) background intensities.
-        :param float peak_prominence: Peak detection prominence.
-        :return: Fit result and Shirley background.
-        :rtype: tuple(lmfit.ModelResult, ndarray)
+        :param float peak_prominence: Peak detection prominence fraction.
+        :param dict peak_constraints: Optional manual peak constraints.
+        :param tuple fit_range: Optional range to use for background and fitting.
+        :param float smooth_sigma: Optional Gaussian smoothing sigma.
+        :return: Fit result.
+        :rtype: dict
         """
 
         profile = self.get_profile(index)
         BE = self.get_binding_energy(index)
-        constraints = parameter_constraint(profile, num_peaks, peak_prominence)
 
-        # Convert peak positions from pixel space to binding energy space
-        for i in range(1, num_peaks + 1):
-            pixel_center = constraints[f"p{i}_center"]["value"]
-            # Map pixel index to the corresponding x-axis value (binding energy)
-            constraints[f"p{i}_center"]["value"] = BE[int(pixel_center)]
+        fit_result = fit_xps(
+            profile,
+            BE,
+            baseline=baseline,
+            num_peaks=num_peaks,
+            peak_prominence=peak_prominence,
+            peak_constraints=peak_constraints,
+            fit_range=fit_range,
+            smooth_sigma=smooth_sigma,
+        )
 
-        peak_labels = [f"p{i}" for i in range(1, num_peaks + 1)]
-
-        result, bg = fit_xps(profile, BE, baseline, peak_labels, constraints)
-
-        return result, bg
+        return fit_result
 
     def get_binding_energy(self, index):
         """Return the binding energy for a given index."""
         kinetic_energy = self.get_kinetic_energy(index)
-        incident_voltage = self.get_metadata("Incident Voltage", index)[0]
+        incident_voltage = self.get_metadata("Beam Energy", index)[0]
         return incident_voltage - kinetic_energy
 
-    def plot_profile(self, index, ax=None, show_fit=False, **kwargs):
+    def plot_profile(self, index, ax=None, show_fit=False, **fit_kwargs):
         """Plot XPS fit results.
 
         :param tuple axes: Tuple of two axes (profile, residuals).
@@ -327,23 +448,43 @@ class XPSAnalyzer(SpectraBase):
 
         ax.plot(binding_energy, profile, label="data")
         ax.set_ylabel("Intensity")
-        ax.set_xlabel("Binding Energy [eV]")
 
         if show_fit:
 
             ax.figure.subplots_adjust(bottom=0.35)
             ax_res = ax.inset_axes([0.0, -0.35, 1.0, 0.25])
+            ax.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
 
-            result, background = self.fit(index, **kwargs)
-            ax.plot(binding_energy, result.best_fit + background, label="fit")
-            ax.plot(binding_energy, background, label="background")
-            for prefix, fit_array in result.eval_components().items():
-                ax.plot(binding_energy, fit_array + background, label=f"{prefix} fit")
+            fit_result = self.fit(index, **fit_kwargs)
+            ax.plot(
+                fit_result["range_abscissa"],
+                fit_result["result"].best_fit + fit_result["background"],
+                label="fit",
+            )
+            ax.plot(
+                fit_result["range_abscissa"],
+                fit_result["background"],
+                label="background",
+            )
+            for label, fit_array in fit_result["result"].eval_components().items():
+                ax.plot(
+                    fit_result["range_abscissa"],
+                    fit_array + fit_result["background"],
+                    label=f"{label} fit",
+                )
             ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
-            ax_res.set_ylabel("Residual Intensity")
-            ax_res.plot(binding_energy, result.residual, label="residual")
+            ax_res.set_ylabel("Residual")
+            ax_res.plot(
+                fit_result["range_abscissa"],
+                fit_result["result"].residual,
+                label="residual",
+            )
             ax_res.set_xlabel("Binding Energy [eV]")
+            ax_res.invert_xaxis()
             ax_res.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+        else:
+            ax.set_xlabel("Binding Energy [eV]")
 
         return ax

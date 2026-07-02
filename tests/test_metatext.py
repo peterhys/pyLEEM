@@ -51,7 +51,7 @@ def test_overlay_text_mixin(xps_reader):
 
         metadata_labels = {
             "Start Voltage": ("Start Voltage", ".2f", "eV"),
-            "Incident Voltage": ("Incident", ".1f", None),
+            "Beam Energy": ("Incident", ".1f", None),
         }
 
         def annotate_image(self, index, ax):

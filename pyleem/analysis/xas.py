@@ -33,6 +33,10 @@ class XASAnalyzer(Analyzer):
         """Return ROI mean intensity for the stack."""
         return np.array([self.get_measurement(index).mean for index in self.indices])
 
+    def correct_drift(self, **kwargs):
+        """Correct the drift of the image stack."""
+        self.correction_shifts = self.calculate_drift(**kwargs)
+
     def calculate_drift(
         self,
         sigma=3,
@@ -41,10 +45,11 @@ class XASAnalyzer(Analyzer):
         max_workers=None,
         chunk_size=32,
         max_distance=None,
+        reference_index=0,
     ):
         """Calculate the correction shifts."""
         images = np.stack([self.get_raw_image(index) for index in self.indices])
-        self.correction_shifts = calculate_drift(
+        return calculate_drift(
             images,
             sigma=sigma,
             crop_size=crop_size,
@@ -52,21 +57,20 @@ class XASAnalyzer(Analyzer):
             max_workers=max_workers,
             chunk_size=chunk_size,
             max_distance=max_distance,
+            reference_index=reference_index,
         )
 
-        return self.correction_shifts
-
     def plot_intensity(self, ax=None):
-        """Plot ROI intensity vs. incident energy."""
+        """Plot ROI intensity vs. Beam Energy."""
         ax = ax or plt.gca()
 
         energy_range = [
-            self.get_metadata("Incident Energy", index)[0] for index in self.indices
+            self.get_metadata("Beam Energy", index)[0] for index in self.indices
         ]
         intensities = self.get_intensities()
 
         ax.plot(energy_range, intensities)
-        ax.set_xlabel("Incident Energy [eV]")
+        ax.set_xlabel("Beam Energy [eV]")
         ax.set_ylabel("Intensity")
 
         return ax

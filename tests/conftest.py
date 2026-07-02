@@ -169,7 +169,7 @@ def xps_raw_file(tmp_path, metadata_bytes, xps_array):
 def xps_reader(xps_raw_file):
     """Create an XPS reader."""
     reader = UViewReader(xps_raw_file)
-    reader.update_metadata({"Incident Voltage": (400, "eV")})
+    reader.update_metadata({"Beam Energy": (400, "eV")})
     return reader
 
 
@@ -242,9 +242,9 @@ def xps_readers(xps_multiple_raw_files):
         xps_multiple_raw_files,
         UViewReader,
         metadata_list=[
-            {"Incident Voltage": (400, "eV")},
-            {"Incident Voltage": (400, "eV")},
-            {"Incident Voltage": (400, "eV")},
+            {"Beam Energy": (400, "eV")},
+            {"Beam Energy": (400, "eV")},
+            {"Beam Energy": (400, "eV")},
         ],
     )
 

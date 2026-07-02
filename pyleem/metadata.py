@@ -50,7 +50,7 @@ def get_metadata_fixed_header(metabytes):
     if metadata["attachedRecipeSize"][0] > 0:
         recipe = metabytes[pos : pos + metadata["attachedRecipeSize"][0]]
         metadata["recipe"] = (recipe.decode("cp1252", errors="replace"), None)
-        pos += metadata["attachedRecipeSize"]
+        pos += metadata["attachedRecipeSize"][0]
     else:
         metadata["recipe"] = (None, None)
 
@@ -87,7 +87,7 @@ def get_metadata_fixed_header(metabytes):
         metadata["extra_leem_data"] = (leemdataextra, None)
         leemdata = parse_leem_data(leemdataextra)
     else:
-        metadata["extra_leem_data"] = b""
+        metadata["extra_leem_data"] = (b"", None)
         leemdata = {}
 
     # Post-processing
@@ -218,10 +218,12 @@ def parse_leem_data(data):
 
             if fov_text.endswith("um") or fov_text.endswith(mm_suffix):
                 fov = float(fov_text.removesuffix("um").removesuffix(mm_suffix))
+                fov_unit = "um"
             else:
                 fov = fov_text
+                fov_unit = None
 
-            leemdata["FOV"] = (fov, "um")
+            leemdata["FOV"] = (fov, fov_unit)
             cal_fov = struct.unpack(f"<f", data[:4])[0]
             leemdata["Cal. FOV"] = (cal_fov, None)
             data = data[4:]
