@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [Unreleased]
+## [0.3.0]
 
 Improve the repository architecture and simplify the API. Breaking changes included.
 
@@ -28,6 +28,7 @@ Improve the repository architecture and simplify the API. Breaking changes inclu
 - Add AreaROIs such as circle, rectangle, and ellipse.
 - Add XASAnalyzer for X-ray absorption image stack analysis.
 - Add LEEMAnalyzer for LEEM image stack analysis.
+- Add annotation and operation modules.
 - Add drift correction algorithm for LEEM and XAS measurements.
 - Add example.ipynb for analysis examples.
 
@@ -74,7 +75,7 @@ LICENSE changed to BSD 3-Clause license with BNL/DOE notices.
 
 ### Added
 
-- Add convolution based (template matching) method for desp disk pattern detection
+- Add convolution based (template matching) method for desp disk pattern detection.
 
 ## [0.1.1]
 
