@@ -137,3 +137,7 @@ data/*
 .vscode/*.json
 joss/paper_files/
 *.html
+
+# example
+example/
+!example.ipynb
