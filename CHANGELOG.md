@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Improve the repository architecture and simplify the API. Breaking changes included. See [design documentation](https://peterhys.github.io/pyLEEM/design.html) for details.
+Improve the repository architecture and simplify the API. Breaking changes included.
 
 ## Changed
 
@@ -16,9 +16,9 @@ Improve the repository architecture and simplify the API. Breaking changes inclu
 - Analyzer now takes care of domain specific analysis.
 - Analyzer class is rewritten as a base class.
 - ROI inputs are now explicitly defined instead of an ROI object.
-- Config class now takes care workflow configurations.
-- Updated domain specific analyzers. 
-- Update design documentation and add examples to README.md.
+- Config class now takes care of workflow configurations.
+- Update domain specific analyzers. 
+- Improved XPS fitting workflow to allow for manual fitting input in the class method.
 
 ## Added
 
@@ -27,10 +27,13 @@ Improve the repository architecture and simplify the API. Breaking changes inclu
 - Workflow class now can read, run, and export the configuration file and content.
 - Add AreaROIs such as circle, rectangle, and ellipse.
 - Add XASAnalyzer for X-ray absorption image stack analysis.
+- Add LEEMAnalyzer for LEEM image stack analysis.
+- Add drift correction algorithm for LEEM and XAS measurements.
+- Add example.ipynb for analysis examples.
 
 ## Removed
 
-- Remove `AnalyzerGroup` class and associated domain specific analyzers.
+- Remove `AnalyzerGroup` class and associated domain specific group analyzers.
 - Remove `StitchAnalyzer` class and moved stitch functionality to the
   spectra analyzer.
 
