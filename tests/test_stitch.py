@@ -5,13 +5,13 @@ import numpy as np
 
 def test_find_stitch_points():
     """Test find_stitch_points across all supported methods and edge cases."""
-    x_ranges = [(0, 10), (5, 15), (10, 20)]
+    x_ranges = [(0, 10), (8, 15), (10, 20)]
 
     assert find_stitch_points(x_ranges=x_ranges, method="midpoint") == pytest.approx(
-        [7.5, 12.5]
+        [9, 12.5]
     )
     assert find_stitch_points(x_ranges=x_ranges, method="end") == [10, 15]
-    assert find_stitch_points(x_ranges=x_ranges, method="start") == [5, 10]
+    assert find_stitch_points(x_ranges=x_ranges, method="start") == [8, 10]
     assert find_stitch_points(x_ranges=[(0, 10)], method="midpoint") == []
 
     with pytest.raises(ValueError, match="Invalid method: other"):
