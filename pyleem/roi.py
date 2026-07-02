@@ -289,9 +289,6 @@ class OvalROI(AreaROI):
             roi.bottom,
             roi.right,
         )
-        self.left = roi.left
-        self.bottom = roi.bottom
-        self.right = roi.right
 
     def validate(self):
         """Validate oval ROI parameters."""
