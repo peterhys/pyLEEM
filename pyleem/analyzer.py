@@ -1,212 +1,151 @@
-import numpy as np
-from pyleem.reader import UViewReader
 import matplotlib.pyplot as plt
-import os
-from scipy.ndimage import gaussian_filter
-from pyleem.utils import find_onset
+from pyleem.roi import NoROI
+import numpy as np
+
+
+def find_onset(profiles):
+    """Find the onset of a profile.
+
+    The profiles can be full images or line profiles.
+    Here we look at the "relative difference". The
+    np.gradient is not used because it tracks two steps at a time.
+
+    :param list profiles: List of profiles to find the onset of.
+    :return: Index of the profile with the steepest rise.
+    :rtype: int
+    """
+
+    profile_sums = np.array([profile.sum() for profile in profiles], dtype=np.float64)
+    profile_diff = np.diff(profile_sums) / profile_sums[:-1]
+
+    return np.argmax(profile_diff)
 
 
 class Analyzer:
     """Base analyzer class for LEEM data analysis.
 
-    Provides core functionality for analyzing LEEM data files using
-    UViewReader to access metadata and image data.
-    To use a different reader class, subclass the Analyzer and
-    redefine the READER_CLS attribute.
+    Provides core functionality for domain-specific LEEM analysis.
+    Raw images come from readers. Processed images default to raw images.
+    Annotated images default to processed images.
 
-    :param str or Path path: Path to LEEM data file.
-    :ivar Path path: Path to data file.
-    :ivar str name: Filename without extension.
-    :ivar UViewReader reader: Reader instance for accessing file data.
+    All variable access should be index aware.
+
+    :param iterable readers: Reader objects used by the analyzer.
+    :ivar list readers: List of readers after onset.
+    :ivar ROI roi: ROI for measuring the image.
+    :ivar int onset: Index of the onset of the image.
     """
 
-    READER_CLS = UViewReader
+    REGISTRY = {}
 
-    def __init__(self, path):
-        self.path = path
-        self.name = os.path.splitext(os.path.basename(path))[0]
-        self.reader = self.READER_CLS(path)
+    def __init_subclass__(cls, **kwargs):
+        """Register the analyzer class in the registry."""
+        super().__init_subclass__(**kwargs)
+        cls.REGISTRY[cls.__name__] = cls
 
-    @property
-    def metadata(self):
-        """Return the metadata from the reader."""
-        return self.reader.metadata
+    def __init__(self, readers, roi=None, onset=0):
 
-    def __lt__(self, other):
-        """Enable sorting by file path."""
-        return self.path < other.path
+        if not readers:
+            raise ValueError("readers cannot be empty")
 
-    @property
-    def image(self):
-        """Return the image data from the reader."""
-        return self.reader.read_image()
+        if onset is None:
+            onset = find_onset([reader.image for reader in readers])
+        self.onset = onset
 
-    def plot_image(self, ax=None):
-        """Plot the raw image data.
+        self.readers = readers[self.onset :]
+        if not self.readers:
+            raise ValueError("readers empty after onset")
+        self.roi = roi or NoROI()
+        self.indices = range(len(self.readers))
+
+    def annotate_image(self, index, ax):
+        """Annotate the image for matplotlib plotting.
+
+        Override to annotate the image. Currently, the annotate_image method
+        does not take additional arguments. The idea is that the whole image
+        stack should be annotated the same way.
+        """
+        return ax
+
+    def get_autolevel(self, image):
+        """Return percentile display limits for image contrast."""
+
+        vmin, vmax = np.percentile(image, [1, 99])
+        if vmin == vmax:
+            # in case the image is uniform
+            return float(vmin) - 0.5, float(vmax) + 0.5
+
+        return float(vmin), float(vmax)
+
+    def plot_image(self, index, ax=None, annotate=False, autolevel=False):
+        """Plot image data.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
+        :param bool autolevel: auto leveling the image. Act as auto-contrast.
         """
         ax = ax or plt.gca()
-        ax.imshow(self.image, label=self.name)
-        ax.set_xlabel("X (pixels)")
-        ax.set_ylabel("Y (pixels)")
-        ax.set_title("Raw Image Data")
+
+        image = self.get_processed_image(index)
+        if autolevel:
+            vmin, vmax = self.get_autolevel(image)
+            ax.imshow(image, vmin=vmin, vmax=vmax)
+        else:
+            ax.imshow(image)
+
+        if annotate:
+            self.annotate_image(index, ax)
+
+        ax.set_xlabel("X [pixels]")
+        ax.set_ylabel("Y [pixels]")
+        ax.set_title("Image Data")
 
         return ax
 
+    def get_measurement(self, index):
+        """Measure the image data."""
+        image = self.get_processed_image(index)
 
-class ProfileAnalyzer(Analyzer):
-    """Base class for LEEM profile and spectrum analysis.
+        return self.roi.measure(image)
 
-    Extracts line profiles from LEEM images using a region of interest (ROI).
+    def get_profile(self, index):
+        """Extract the line profile from the image data."""
+        return self.get_measurement(index).profile
 
-    :param str or Path path: Path to LEEM data file.
-    :param dict or LineROI roi: Region of interest defining the line profile.
-    :param kwargs: Additional keyword arguments.
+    def get_pixel(self, index):
+        """Return the pixel positions for a profile."""
+        profile = self.get_profile(index)
+        if profile is None:
+            raise ValueError("Profile is not available")
+        return np.arange(len(profile))
 
-    :ivar ndarray profile: 1D array of intensity values along ROI.
-    :ivar ndarray pixel: Pixel indices corresponding to profile.
-    :ivar ndarray abscissa: X-axis values (pixels or calibrated units).
-    :ivar ndarray ordinate: Y-axis values (intensity or processed values).
-    """
+    def get_raw_image(self, index):
+        """Return the raw image."""
+        return self.readers[index].image
 
-    def __init__(self, path, roi):
-        super().__init__(path)
+    def get_processed_image(self, index):
+        """Return the processed image.
 
-        self.roi = roi
-        self._profile = self.roi.read_profile(self.image)
-        self.pixel = np.arange(len(self.profile))
-        self._abscissa, self._abscissa_label = self.pixel, "Pixel"
-        self._ordinate, self._ordinate_label = self.profile, "Intensity"
-
-    @property
-    def abscissa(self):
-        """Return the abscissa values."""
-        return self._abscissa
-
-    @property
-    def ordinate(self):
-        """Return the ordinate values."""
-        return self._ordinate
-
-    @property
-    def abscissa_label(self):
-        """Return the abscissa label."""
-        return self._abscissa_label
-
-    @property
-    def ordinate_label(self):
-        """Return the ordinate label."""
-        return self._ordinate_label
-
-    @property
-    def profile(self):
-        """Return the profile.
-
-        Unlike image, profile is pre-computed.
+        The method should be overridden if
+        the processed image is not the same.
         """
-        return self._profile
+        return self.get_raw_image(index)
 
-    def process_profile(self, sigma):
-        """Default profile filtering method.
+    def get_metadata(self, key, index):
+        """Get metadata entries from all readers."""
+        return self.readers[index].metadata[key]
 
-        :param float sigma: Standard deviation for Gaussian kernel.
-        :return: Filtered profile.
-        :rtype: ndarray
+    def analyze(self, **kwargs):
+        """Perform the analysis.
+
+        The method is not required if the analyzer does not need to
+        work with configuration and workflow logic.
+        The analyze method is recommended to be stack analysis
+        logic instead of acting on individual readers.
+
+        For large data output, it is recommended for analyze to save
+        the result to a file.
         """
-        return gaussian_filter(self.profile, sigma=sigma)
-
-    def plot_profile(self, ax=None):
-        """Plot the profile data.
-
-        :param matplotlib.axes.Axes ax: Matplotlib axes object.
-        """
-
-        ax = ax or plt.gca()
-        ax.plot(self.abscissa, self.ordinate, label=self.name)
-        ax.set_xlabel(self.abscissa_label)
-        ax.set_ylabel(self.ordinate_label)
-
-        return ax
+        raise NotImplementedError("'analyze' method is not implemented")
 
 
-class AnalyzerGroup:
-    """Base class for batch analysis of multiple LEEM files.
-
-    Manages a collection of analyzer instances for processing multiple
-    data files together.
-
-    :param list paths: List of paths to LEEM data files.
-    :param type analyzer: Analyzer class to instantiate for each file.
-    :param kwargs: Additional keyword arguments for each analyzer.
-
-    :ivar list paths: List of file paths.
-    :ivar list analyzers: List of analyzer instances.
-    :ivar list time_intervals: Time intervals in seconds from first acquisition.
-    """
-
-    def __init__(self, analyzers):
-
-        self.analyzers = analyzers
-        self.time_intervals = self.get_time_intervals()
-
-    def __len__(self):
-        """Return the number of analyzers in the group."""
-        return len(self.analyzers)
-
-    def __iter__(self):
-        """Iterate over the analyzers in the group."""
-        return iter(self.analyzers)
-
-    def __getitem__(self, index):
-        """Get the analyzer at the specified index."""
-        return self.analyzers[index]
-
-    def get_metas(self, key):
-        """Get metadata values from all analyzers.
-
-        :param str key: Metadata key to retrieve.
-        :return: List of metadata values.
-        :rtype: list
-        """
-        return [analyzer.metadata[key][0] for analyzer in self.analyzers]
-
-    def get_attrs(self, attr_name):
-        """Get attribute values from all analyzers.
-
-        :param str attr_name: Attribute name to retrieve.
-        :return: List of attribute values.
-        :rtype: list
-        """
-        return [getattr(analyzer, attr_name) for analyzer in self.analyzers]
-
-    def get_time_intervals(self):
-        """Calculate time intervals from the first acquisition.
-
-        :return: List of time intervals in seconds.
-        :rtype: list
-        """
-        timestamps = self.get_metas("TimeStamp")
-        timedelta_list = np.cumsum(np.diff(timestamps, prepend=timestamps[0]))
-        return [timedelta.total_seconds() for timedelta in timedelta_list]
-
-    def find_onset(self):
-        """Find the onset of the time series.
-
-        In cases that the collection is turned on before the source,
-        first several frames do not have signal. Here we detect through
-        simple gradient analysis where the onset is.
-
-        If the groups are images, we take the sum of the image and then find the onset.
-        If the groups are profiles, we find the onset of the profiles.
-
-        :return: Index of the analyzer with the steepest rise.
-        :rtype: int
-        """
-
-        try:
-            profiles = self.get_attrs("profile")
-        except AttributeError:
-            profiles = [analyzer.image.sum() for analyzer in self.analyzers]
-
-        return find_onset(profiles)
+Analyzer.REGISTRY[Analyzer.__name__] = Analyzer
