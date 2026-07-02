@@ -26,8 +26,9 @@ usage/config
 :maxdepth: 1
 :caption: Analysis
 
-analysis/xps
+analysis/leem
 analysis/xas
+analysis/xps
 analysis/sees
 analysis/desp
 ```
@@ -70,6 +71,9 @@ ref/operation_ref
 ref/annotation_ref
 ref/metadata_ref
 ref/metainfo_ref
+ref/fullfield_ref
+ref/spectra_ref
+ref/leem_ref
 ref/xas_ref
 ref/sees_ref
 ref/desp_ref
