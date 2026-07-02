@@ -15,11 +15,11 @@ reference peak index and energy value.
 binding energy, fits profiles with Shirley background subtraction and
 pseudo-Voigt peaks, plots fit results, and can stitch profiles through the
 shared spectra base class. Automatic peak fitting detects peaks on the
-background-subtracted signal. Manual fitting can be done by provding
-a dictionary of peak constraints. The constraints follows the `lmfit` format.
+background-subtracted signal. Manual fitting can be done by providing
+a dictionary of peak constraints. The constraints follow the `lmfit` format.
 
-The LEEM spectra analyzer has limited energy range, large energy range spectra
-requires to be stitched together. The stitching method takes a list of indices
+The LEEM spectra analyzer has limited energy range; large energy range spectra
+need to be stitched together. The stitching method takes a list of indices
 and determines the overlapped regions, and outputs a combined profile.
 
 ## Example

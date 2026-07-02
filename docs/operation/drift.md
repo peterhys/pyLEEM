@@ -33,14 +33,14 @@ Parameters for drift correction (`calculate_drift`):
   - 10 means 0.1 pixel precision.
   - Larger values are slower and usually only help after the pair registration is already stable.
 - `max_workers`: Number of worker threads for multi-threading.
-  - Recommend to 4 - 8 depending on the CPU.
+  - Recommended: 4–8 depending on the CPU.
 - `chunk_size`: Number of image-pairs per threaded task.
-  - Recommend to 16 - 64 depending on the CPU.
+  - Recommended: 16–64 depending on the CPU.
 - `max_distance`: Pairing window size.
   - 1 means correct image based on the adjacent frames.
   - If there are a lot of frames with contrast or feature change, use higher values to calculate the overall correlation.
   - Higher values are much slower (1 is log(n), 2 is log(n^2), 3 is log(n^3), etc.)
-  - Higher values may results in jitters depends on the data.
+  - Higher values may result in jitter depending on the data.
 - `reference_index`: Center frame to reference the shift.
   - The reference index is important especially for ROI selection.
 

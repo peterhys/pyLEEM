@@ -2,8 +2,9 @@
 
 X-ray Absorption Spectroscopy (XAS) analysis measures ROI intensity across an
 image stack. Drift correction is available as an explicit step before intensity
-extraction. If `drift_correct` method is not called, the raw image is used for
-analysis.
+extraction. If `correct_drift` method is not called, the raw image is used for
+analysis. The shift information can be separately accessed from the method
+`calculate_drift()`.
 
 ## Example
 
@@ -24,7 +25,7 @@ readers = read_files(
 roi = RectROI(top=20, left=30, bottom=80, right=90)
 
 analyzer = XASAnalyzer(readers, roi=roi)
-corrected_images, shifts = analyzer.drift_correct(sigma=3, crop_size=128)
+analyzer.correct_drift(sigma=3, crop_size=128)
 intensities = analyzer.get_intensities()
 
 ax = analyzer.plot_intensity()
