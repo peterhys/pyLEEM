@@ -50,7 +50,7 @@ def get_metadata_fixed_header(metabytes):
     if metadata["attachedRecipeSize"][0] > 0:
         recipe = metabytes[pos : pos + metadata["attachedRecipeSize"][0]]
         metadata["recipe"] = (recipe.decode("cp1252", errors="replace"), None)
-        pos += metadata["attachedRecipeSize"]
+        pos += metadata["attachedRecipeSize"][0]
     else:
         metadata["recipe"] = (None, None)
 
@@ -87,7 +87,7 @@ def get_metadata_fixed_header(metabytes):
         metadata["extra_leem_data"] = (leemdataextra, None)
         leemdata = parse_leem_data(leemdataextra)
     else:
-        metadata["extra_leem_data"] = b""
+        metadata["extra_leem_data"] = (b"", None)
         leemdata = {}
 
     # Post-processing
