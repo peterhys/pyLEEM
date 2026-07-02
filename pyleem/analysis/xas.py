@@ -41,6 +41,7 @@ class XASAnalyzer(Analyzer):
         max_workers=None,
         chunk_size=32,
         max_distance=None,
+        reference_index=0,
     ):
         """Calculate the correction shifts."""
         images = np.stack([self.get_raw_image(index) for index in self.indices])
@@ -52,6 +53,7 @@ class XASAnalyzer(Analyzer):
             max_workers=max_workers,
             chunk_size=chunk_size,
             max_distance=max_distance,
+            reference_index=reference_index,
         )
 
         return self.correction_shifts
