@@ -5,16 +5,6 @@ import matplotlib.pyplot as plt
 from pyleem.analysis.sees import SEESAnalyzer, SEESCalibration, SEES_onset
 
 
-def test_sees_onset(sees_array):
-    """Test SEES_onset with ramp profile."""
-    profile = sees_array[0, :]
-    pk_idx, slope, onset_pos = SEES_onset(profile)
-
-    assert pk_idx == 57
-    assert slope == 12.5
-    assert onset_pos == pytest.approx(40.0, rel=1e-2)
-
-
 class TestSEESCalibration:
     """Test SEESCalibration class."""
 

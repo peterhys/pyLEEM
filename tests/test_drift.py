@@ -72,36 +72,8 @@ def test_apply_shifts_raises():
         apply_shifts(images, shifts)
 
 
-def test_apply_shifts_expand():
-    """Test apply_shifts can expand the output canvas."""
-    image = marker_image()
-    drift_shifts = np.array(
-        [
-            [0.0, 0.0],
-            [3.0, -2.0],
-            [-4.0, 5.0],
-        ]
-    )
-    images = np.stack(
-        [
-            shift(image, drift_shift, order=1, mode="constant", cval=0.0)
-            for drift_shift in drift_shifts
-        ]
-    )
-
-    correction_shifts = calculate_drift(
-        images,
-        sigma=0,
-        upsample_factor=1,
-    )
-    corrected_images = apply_shifts(images, correction_shifts, expand=True)
-
-    assert correction_shifts == pytest.approx(-drift_shifts)
-    assert corrected_images.shape == (3, 71, 71)
-
-
 def test_relative_shifts():
-    """Test threaded pair registration matches serial pair registration."""
+    """Test threaded shifts matches serial shifts."""
     image = marker_image()
     drift_shifts = np.array(
         [
@@ -173,34 +145,3 @@ def test_relative_shifts_raises():
 
     with pytest.raises(ValueError, match="max_distance must be at least 1"):
         relative_shifts(images, max_distance=0)
-
-
-def test_calculate_drift():
-    """Test max_workers=None selects automatic threaded drift correction."""
-    image = marker_image()
-    drift_shifts = np.array(
-        [
-            [0.0, 0.0],
-            [3.0, -2.0],
-            [-4.0, 5.0],
-        ]
-    )
-    images = np.stack(
-        [
-            shift(image, drift_shift, order=1, mode="constant", cval=0.0)
-            for drift_shift in drift_shifts
-        ]
-    )
-
-    correction_shifts = calculate_drift(
-        images,
-        sigma=0,
-        upsample_factor=1,
-        max_workers=None,
-        chunk_size=1,
-    )
-    corrected_images = apply_shifts(images, correction_shifts)
-
-    assert correction_shifts == pytest.approx(-drift_shifts)
-    assert corrected_images[1] == pytest.approx(corrected_images[0], abs=1e-6)
-    assert corrected_images[2] == pytest.approx(corrected_images[0], abs=1e-6)

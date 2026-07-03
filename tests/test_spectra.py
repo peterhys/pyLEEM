@@ -33,7 +33,7 @@ def test_spectra_analyzer_get_kinetic_energy(xps_readers, roi):
     assert energy[-1] == pytest.approx(125.6875)
 
 
-def test_spectra_analyzer_stitch_profiles(raw_reader_factory, roi):
+def test_spectra_analyzer_stitch_profiles(create_reader, roi):
     """Test SpectraAnalyzer stitches profiles by kinetic energy."""
     images = []
     for offset in [10, 60, 110]:
@@ -42,7 +42,7 @@ def test_spectra_analyzer_stitch_profiles(raw_reader_factory, roi):
         images.append(image)
 
     readers = [
-        raw_reader_factory(f"spectra_{index}.dat", image)
+        create_reader(f"spectra_{index}.dat", image)
         for index, image in enumerate(images)
     ]
     for reader, start_voltage in zip(readers, [0.0, 4.0, 8.0]):

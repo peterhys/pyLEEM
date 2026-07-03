@@ -81,7 +81,7 @@ def test_analyzer_onset_raises(xps_reader):
         Analyzer([xps_reader], onset=1)
 
 
-def test_analyzer_onset_auto(raw_reader_factory):
+def test_analyzer_onset_auto(create_reader):
     """Test Analyzer can derive onset from image intensity."""
     images = [
         np.ones((256, 128), dtype=np.uint16),
@@ -89,7 +89,7 @@ def test_analyzer_onset_auto(raw_reader_factory):
         np.ones((256, 128), dtype=np.uint16) * 20,
     ]
     readers = [
-        raw_reader_factory(f"onset_{index}.dat", image)
+        create_reader(f"onset_{index}.dat", image)
         for index, image in enumerate(images)
     ]
 
@@ -144,10 +144,10 @@ def test_analyzer_get_autolevel(xps_reader):
     assert vmax == pytest.approx(99)
 
 
-def test_analyzer_plot_image_autolevel(raw_reader_factory, mock_analyzer):
+def test_analyzer_plot_image_autolevel(create_reader, mock_analyzer):
     """Test plot_image autolevel changes display limits only."""
     image = np.arange(256 * 128, dtype=np.uint16).reshape(256, 128)
-    reader = raw_reader_factory("autolevel.dat", image)
+    reader = create_reader("autolevel.dat", image)
     analyzer = mock_analyzer([reader])
     fig, ax = plt.subplots()
 

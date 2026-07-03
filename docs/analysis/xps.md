@@ -22,6 +22,8 @@ The LEEM spectra analyzer has limited energy range; large energy range spectra
 need to be stitched together. The stitching method takes a list of indices
 and determines the overlapped regions, and outputs a combined profile.
 
+The analyzer uses the {py:class}`~pyleem.analysis.spectra.SpectraBase` base class for converting the pixel axis to binding energy and adding stitching logics.
+
 ## Example
 
 ```python

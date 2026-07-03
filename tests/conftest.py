@@ -2,6 +2,10 @@ import pytest
 import struct
 import numpy as np
 import cv2
+import matplotlib
+
+matplotlib.use("Agg", force=True)
+
 import matplotlib.pyplot as plt
 from pyleem.reader import UViewReader, read_files
 from pyleem.roi import LineROI
@@ -48,6 +52,33 @@ def create_noisy_array(seed=0):
     noisy_array = np.zeros((256, 128), dtype=np.uint16)
     noisy_array[0, :] = np.random.default_rng(seed).integers(0, 4, 128, dtype=np.uint16)
     return noisy_array
+
+
+def create_fullfield_images(shape=(256, 128)):
+    """Create four black-and-white full field images.
+
+    Here we have four images:
+    - left_black: left half is black, right half is white
+    - all_white: all pixels are white
+    - all_black: all pixels are black
+    - left_white: left half is white, right half is black
+
+    In the tests, we pick three regions to test the profiles.
+    """
+
+    _, width = shape
+    midpoint = width // 2
+
+    left_black = np.full(shape, 1000, dtype=np.uint16)
+    left_black[:, :midpoint] = 0
+
+    all_white = np.full(shape, 1000, dtype=np.uint16)
+    all_black = np.zeros(shape, dtype=np.uint16)
+
+    left_white = np.zeros(shape, dtype=np.uint16)
+    left_white[:, :midpoint] = 1000
+
+    return [left_black, all_white, all_black, left_white]
 
 
 @pytest.fixture
@@ -174,15 +205,42 @@ def xps_reader(xps_raw_file):
 
 
 @pytest.fixture
-def raw_reader_factory(tmp_path, metadata_bytes):
+def create_reader(tmp_path, metadata_bytes):
     """Create raw files and return readers."""
 
-    def create_reader(name, image):
+    def reader_from_content(name, content):
         path = tmp_path / name
-        path.write_bytes(metadata_bytes + b"\xff" * 2000 + image.tobytes())
+        path.write_bytes(metadata_bytes + b"\xff" * 2000 + content.tobytes())
         return UViewReader(path)
 
-    return create_reader
+    return reader_from_content
+
+
+@pytest.fixture
+def fullfield_readers(create_reader):
+    """Create full-field readers with known image intensities and metadata."""
+    return [
+        create_reader(f"fullfield_{index}.dat", image)
+        for index, image in enumerate(create_fullfield_images())
+    ]
+
+
+@pytest.fixture
+def xas_readers(fullfield_readers):
+    """Create XAS readers from full-field readers."""
+    readers = fullfield_readers
+    for index, reader in enumerate(readers):
+        reader.update_metadata({"Beam Energy": (10.0 + index, "eV")})
+    return readers
+
+
+@pytest.fixture
+def leem_readers(fullfield_readers):
+    """Create LEEM readers from full-field readers."""
+    readers = fullfield_readers
+    for index, reader in enumerate(readers):
+        reader.update_metadata({"Start Voltage": (10.0 + index, "eV")})
+    return readers
 
 
 @pytest.fixture
