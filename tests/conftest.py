@@ -2,6 +2,10 @@ import pytest
 import struct
 import numpy as np
 import cv2
+import matplotlib
+
+matplotlib.use("Agg", force=True)
+
 import matplotlib.pyplot as plt
 from pyleem.reader import UViewReader, read_files
 from pyleem.roi import LineROI

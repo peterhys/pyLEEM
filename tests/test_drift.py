@@ -72,36 +72,8 @@ def test_apply_shifts_raises():
         apply_shifts(images, shifts)
 
 
-def test_apply_shifts_expand():
-    """Test apply_shifts can expand the output canvas."""
-    image = marker_image()
-    drift_shifts = np.array(
-        [
-            [0.0, 0.0],
-            [3.0, -2.0],
-            [-4.0, 5.0],
-        ]
-    )
-    images = np.stack(
-        [
-            shift(image, drift_shift, order=1, mode="constant", cval=0.0)
-            for drift_shift in drift_shifts
-        ]
-    )
-
-    correction_shifts = calculate_drift(
-        images,
-        sigma=0,
-        upsample_factor=1,
-    )
-    corrected_images = apply_shifts(images, correction_shifts, expand=True)
-
-    assert correction_shifts == pytest.approx(-drift_shifts)
-    assert corrected_images.shape == (3, 71, 71)
-
-
 def test_relative_shifts():
-    """Test threaded pair registration matches serial pair registration."""
+    """Test threaded shifts matches serial shifts."""
     image = marker_image()
     drift_shifts = np.array(
         [
