@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from pyleem.analyzer import ProfileAnalyzer, AnalyzerGroup
-from pyleem.config import Config
+from pyleem.analyzer import Analyzer
+from scipy.ndimage import gaussian_filter
 
 
 def SEES_onset(profile):
@@ -21,50 +21,47 @@ def SEES_onset(profile):
     return pk_idx, slope, onset_pos
 
 
-def calibrate_sees(analyzers, cal_params, metadata=None):
-    """Calibrate energy scale using onset positions."""
-    sigma = cal_params.get("sigma", 10)
-    onset_pos = []
-    start_voltages = [] if metadata is None else metadata["Start Voltage"]
-    for analyzer in analyzers:
-        onset_pos.append(SEES_onset(analyzer.process_profile(sigma))[2])
-        if metadata is None:
-            start_voltages.append(analyzer.metadata["Start Voltage"][0])
+class SEESBase(Analyzer):
+    """Base class for SEES analyzer."""
 
-    onset_pos = np.array(onset_pos)
-
-    pixel_per_ev = cal_params.get("pixel_per_ev", None) or np.mean(
-        np.diff(onset_pos) / -np.diff(start_voltages)
-    )
-    peak_shift = cal_params.get("peak_shift", None) or np.mean(
-        start_voltages + onset_pos / pixel_per_ev
-    )
-
-    return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}
+    def get_processed_profile(self, index, sigma):
+        """Return the processed profile."""
+        return gaussian_filter(self.get_profile(index), sigma=sigma)
 
 
-class SEESConfig(Config):
+class SEESCalibration(SEESBase):
     """Config for SEES analyzer."""
 
-    def calibrate_results(self, cal_section):
-        """Calibrate energy scale using onset positions."""
-        roi = self.get_roi()
-        paths = self.get_paths(cal_section["paths"])
-        analyzers = [ProfileAnalyzer(path, roi) for path in paths]
-        cal_params = cal_section.get("parameters", {})
-        metadata = cal_section.get("metadata", None)
+    save_keys = ("pixel_per_ev", "peak_shift")
 
-        return calibrate_sees(analyzers, cal_params, metadata)
+    def analyze(self, sigma=10, pixel_per_ev=None, peak_shift=None):
+        """Calibration of the SEES analyzer."""
+        onset_pos = []
+        start_voltages = np.array(
+            [self.get_metadata("Start Voltage", index)[0] for index in self.indices]
+        )
+        for index in self.indices:
+            profile = self.get_processed_profile(index, sigma)
+            onset_pos.append(SEES_onset(profile)[2])
+
+        onset_pos = np.array(onset_pos)
+
+        if pixel_per_ev is None:
+            pixel_per_ev = np.mean(np.diff(onset_pos) / -np.diff(start_voltages))
+        if peak_shift is None:
+            peak_shift = np.mean(start_voltages + onset_pos / pixel_per_ev)
+
+        return {"pixel_per_ev": pixel_per_ev, "peak_shift": peak_shift}
 
 
-class SEESAnalyzer(ProfileAnalyzer):
+class SEESAnalyzer(SEESBase):
     """Analyzer for secondary electron energy spectroscopy data.
 
     Analyzes SEES profiles to determine surface potentials by measuring
     secondary electron emission onset. Onset shifts with surface charging.
 
-    :param str or Path path: Path to LEEM data file.
-    :param dict or LineROI roi: Region of interest for profile extraction.
+    :param list readers: List of readers.
+    :param ROI roi: Region of interest for profile extraction.
     :param float sigma: Gaussian filter sigma for smoothing.
 
     :ivar int pk_idx: Index of steepest rise.
@@ -73,57 +70,52 @@ class SEESAnalyzer(ProfileAnalyzer):
     :ivar float surface_potential: Measured surface potential in V.
     """
 
-    def __init__(self, path, roi, pixel_per_ev, peak_shift, sigma=10):
+    def __init__(self, readers, roi, pixel_per_ev, peak_shift, onset=0, sigma=10):
+        super().__init__(readers, roi=roi, onset=onset)
 
-        super().__init__(path, roi)
-
+        self.pixel_per_ev = pixel_per_ev
+        self.peak_shift = peak_shift
         self.sigma = sigma
-        processed_profile = self.process_profile(sigma)
 
-        self.pk_idx, self.slope, self.onset_pos = SEES_onset(processed_profile)
-        self.KE = (self.pixel - self.onset_pos) / pixel_per_ev
-
-        self._abscissa, self._abscissa_label = self.KE, "Energy [eV]"
-
-        self.potential = peak_shift - (
-            self.metadata["Start Voltage"][0] + self.onset_pos / pixel_per_ev
+    def analyze_profile(self, index):
+        """Analyze a profile."""
+        profile = self.get_processed_profile(index, self.sigma)
+        pk_idx, slope, onset_pos = SEES_onset(profile)
+        kinetic_energy = (self.get_pixel(index) - onset_pos) / self.pixel_per_ev
+        surface_potential = self.peak_shift - (
+            self.get_metadata("Start Voltage", index)[0] + onset_pos / self.pixel_per_ev
         )
 
-    def plot(self, ax=None, show_fit=False):
+        return {
+            "kinetic_energy": kinetic_energy,
+            "surface_potential": surface_potential,
+            "onset_pos": onset_pos,
+            "pk_idx": pk_idx,
+            "slope": slope,
+        }
+
+    def plot_profile(self, index, ax=None, show_fit=False):
         """Plot profile with optional onset fit overlay.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
         :param bool show_fit: Whether to show onset fit line.
         """
+
+        result = self.analyze_profile(index)
+        profile = self.get_profile(index)
+
         ax = ax or plt.gca()
-        ax.plot(self.abscissa, self.ordinate, label=self.name)
+
+        ax.plot(result["kinetic_energy"], profile)
         if show_fit:
             ax.plot(
-                [0, self.abscissa[self.pk_idx]],
-                [0, self.ordinate[self.pk_idx]],
+                [0, result["kinetic_energy"][result["pk_idx"]]],
+                [0, profile[result["pk_idx"]]],
                 "--",
-                label=f"{self.name} fit",
+                label="fit",
             )
-        ax.set_xlabel(self.abscissa_label)
-        ax.set_ylabel(self.ordinate_label)
+            ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+        ax.set_xlabel("Energy [eV]")
+        ax.set_ylabel("Intensity")
 
-
-class SEESGroup(AnalyzerGroup):
-    """Batch analyzer for multiple SEES profiles.
-
-    Processes multiple SEES measurements acquired at different
-    accelerating voltages. Automatically calibrates energy scale.
-
-    Files should be sorted chronologically.
-
-    :param list paths: List of paths to LEEM data files.
-    :param dict or LineROI roi: Region of interest for profile extraction.
-    :param float sigma: Gaussian filter sigma for smoothing.
-    """
-
-    def __init__(self, paths, roi, pixel_per_ev, peak_shift, sigma=10):
-        self.analyzers = [
-            SEESAnalyzer(path, roi, pixel_per_ev, peak_shift, sigma) for path in paths
-        ]
-        self.roi = roi
-        super().__init__(self.analyzers)
+        return ax

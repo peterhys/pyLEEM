@@ -1,20 +1,17 @@
-import pytest
-import numpy as np
-import scipy.stats
-from pyleem.analysis.xps import (
-    shirley_background,
-    pseudo_voigt_fits,
-    parameter_estimation,
-    parameter_contraint,
-    fit_xps,
-    XPSAnalyzer,
-    XPSConfig,
-    XPSGroup,
-    calibrate_xps,
-)
 import matplotlib.pyplot as plt
-from lmfit.models import PseudoVoigtModel
-from pyleem.analyzer import ProfileAnalyzer
+import numpy as np
+import pytest
+import scipy.stats
+
+from pyleem.analysis.xps import (
+    XPSAnalyzer,
+    XPSCalibration,
+    fit_xps,
+    parameter_constraint,
+    parameter_estimation,
+    pseudo_voigt_fits,
+    shirley_background,
+)
 
 
 def test_shirley_background(xps_array):
@@ -23,7 +20,6 @@ def test_shirley_background(xps_array):
     x = np.arange(128)
     background = 100 / (1 + np.exp(0.06 * (x - 60)))
 
-    # test roughly equal
     assert np.allclose(extracted_bg, background, rtol=0.5, atol=2)
 
 
@@ -35,7 +31,6 @@ def test_shirley_convergence():
     sig = scipy.stats.norm.pdf(x, mean, sigma) * 20
 
     total_sig = tan_bg + sig
-    # base_diff is the difference between left and right baseline values
     base_diff = tan_bg[0] - tan_bg[-1]
     s_bg1 = shirley_background(total_sig, base_diff)
     total_sig_2 = s_bg1 + sig
@@ -48,12 +43,10 @@ def test_shirley_convergence():
 
 def test_shirley_background_edge_cases():
     """Test edge cases for Shirley background."""
-    # Flat signal
     flat_signal = np.ones(100) * 10
     bg = shirley_background(flat_signal, 0.0, iterations=0)
     assert np.all(bg == 0)
 
-    # Random signal with base_diff
     signal = np.random.rand(50) * 10 + 5
     bg = shirley_background(signal, 1.0, iterations=5, tol=1e-3)
     assert len(bg) == len(signal)
@@ -61,43 +54,45 @@ def test_shirley_background_edge_cases():
 
 def test_pseudo_voigt_fits():
     """Test pseudo-Voigt model creation."""
-    peaks = ["peak1", "peak2"]
-    constraints = {
-        "peak1_center": {"value": 1.0, "min": 0.5, "max": 1.5, "vary": False},
-        "peak2_center": {"value": 2.0, "min": 1.5, "max": 2.5},
+    peak_constraints = {
+        "peak1": {"center": {"value": 1.0, "min": 0.5, "max": 1.5, "vary": False}},
+        "peak2": {"center": {"value": 2.0, "min": 1.5, "max": 2.5}},
     }
-    model, params = pseudo_voigt_fits(peaks, constraints)
+    model, params = pseudo_voigt_fits(peak_constraints)
 
     assert model is not None and params is not None
 
-    # Verify constraints
-    for peak in peaks:
+    for peak in peak_constraints:
         for suffix in ["amplitude", "sigma", "fraction"]:
             assert f"{peak}_{suffix}" in params
             assert params[f"{peak}_{suffix}"].min == 0
 
-    for key, value in constraints.items():
-        assert params[key].value == value["value"]
-        assert params[key].min == value["min"]
-        assert params[key].max == value["max"]
-        assert params[key].vary == value.get("vary", True)
+    assert params["peak1_center"].value == 1.0
+    assert params["peak1_center"].min == 0.5
+    assert params["peak1_center"].max == 1.5
+    assert params["peak1_center"].vary is False
+    assert params["peak2_center"].value == 2.0
+    assert params["peak2_center"].min == 1.5
+    assert params["peak2_center"].max == 2.5
 
 
 def test_pseudo_voigt_fits_variants():
-    """Test pseudo-Voigt with single peak and no constraints."""
-    # Single peak
-    peaks = ["peak1"]
-    constraints = {"peak1_center": {"value": 5.0, "min": 4.0, "max": 6.0}}
-    model, params = pseudo_voigt_fits(peaks, constraints)
+    """Test pseudo-Voigt with single and minimal constraints."""
+    constraints = {"peak1": {"center": {"value": 5.0, "min": 4.0, "max": 6.0}}}
+    model, params = pseudo_voigt_fits(constraints)
     assert params["peak1_center"].value == 5.0
 
-    # No constraints
-    peaks = ["p1", "p2", "p3"]
-    model, params = pseudo_voigt_fits(peaks)
-    for peak in peaks:
+    constraints = {"p1": {}, "p2": {}, "p3": {}}
+    model, params = pseudo_voigt_fits(constraints)
+    for peak in constraints:
         for suffix in ["center", "amplitude", "sigma", "fraction"]:
             assert f"{peak}_{suffix}" in params
             assert params[f"{peak}_{suffix}"].min == 0
+
+    with pytest.raises(
+        ValueError, match="peak_constraints must contain at least one peak"
+    ):
+        pseudo_voigt_fits({})
 
 
 def test_parameter_estimation():
@@ -107,39 +102,83 @@ def test_parameter_estimation():
     peak2 = 30 * np.exp(-((x - 70) ** 2) / (2 * 3**2))
     profile = peak1 + peak2 + 5
 
-    centers, _, _ = parameter_estimation(profile, 2, peak_prominence=0.1)
+    centers, sigmas, peak_areas = parameter_estimation(
+        profile, x, 2, peak_prominence=0.1
+    )
 
     assert len(centers) == 2
-    assert 250 < centers[0] < 350 and 650 < centers[1] < 750
+    assert centers[0] == pytest.approx(30, abs=0.2)
+    assert centers[1] == pytest.approx(70, abs=0.2)
+    assert np.all(sigmas > 0)
+    assert np.all(peak_areas > 0)
 
 
-def test_parameter_estimation_edge_cases():
-    """Test parameter estimation with single peak and high prominence."""
+def test_parameter_estimation_raise():
+    """Test parameter estimation raises an error if expected peaks are not found."""
     x = np.linspace(0, 100, 500)
-    peak = 100 * np.exp(-((x - 50) ** 2) / (2 * 10**2))
-    profile = peak + 2
-
-    # Request 2 peaks but only 1 exists - should split
-    centers, _, _ = parameter_estimation(profile, 2, peak_prominence=0.05)
-    assert len(centers) == 2
-    assert centers[0] < centers[1]
+    profile = np.zeros(500)
+    with pytest.raises(ValueError, match="found 0 peaks, but expected 1"):
+        parameter_estimation(profile, x, 1, peak_prominence=0.1)
 
 
-def test_parameter_contraint():
+def test_parameter_estimation_narrow_peak():
+    """Test parameter estimation omits narrow peaks."""
+    x = np.linspace(0, 100, 500)
+    profile = 100 * np.exp(-((x - 50) ** 2) / (2 * 10**2))
+    profile[10] = 200
+
+    centers, sigma, peak_area = parameter_estimation(profile, x, 1, peak_prominence=0.1)
+    assert len(centers) == 1
+    assert centers[0] == pytest.approx(50, abs=0.2)
+    assert sigma[0] == pytest.approx(11.7, abs=0.2)
+    assert peak_area[0] == pytest.approx(2506.6, abs=50)
+
+
+def test_parameter_estimation_abscissa_conversion():
+    """Test parameter estimation returns the peaks it detects.
+
+    Here we test that the abscissa returns the correct peak
+    parameters.
+    """
+    x = np.linspace(0, 100, 500)
+    profile = 100 * np.exp(-((x - 50) ** 2) / (2 * 10**2))
+
+    centers, sigma, peak_area = parameter_estimation(profile, x, 1, peak_prominence=0.1)
+    assert len(centers) == 1
+    assert centers[0] == pytest.approx(50, abs=0.2)
+    # PseudoVogit sigma is 11.7
+    assert sigma[0] == pytest.approx(11.7, abs=0.2)
+    assert peak_area[0] == pytest.approx(2506.6, abs=50)
+
+    # test abscissa conversion
+    abscissa = np.linspace(100, 400, 500)
+
+    centers, sigmas, peak_areas = parameter_estimation(
+        profile, abscissa, 1, peak_prominence=0.1
+    )
+
+    assert centers[0] == pytest.approx(250, abs=0.6)
+    assert sigmas[0] == pytest.approx(35.1, abs=0.6)
+    assert peak_areas[0] == pytest.approx(7519.8, abs=100)
+
+
+def test_parameter_constraint():
     """Test parameter constraint generation."""
     x = np.linspace(0, 100, 2000)
     peaks_data = [
         50 * np.exp(-((x - pos) ** 2) / (2 * 3**2)) for pos in [20, 40, 60, 80]
     ]
-    profile = sum(peaks_data) + 3
+    profile = sum(peaks_data)
 
-    constraints = parameter_contraint(profile, 4, peak_prominence=0.05)
+    constraints = parameter_constraint(profile, x, 4, peak_prominence=0.05)
 
     for i in range(1, 5):
-        assert f"p{i}_center" in constraints
-        assert f"p{i}_amplitude" in constraints
-        assert f"p{i}_sigma" in constraints
-        assert "value" in constraints[f"p{i}_center"]
+        peak = constraints[f"p{i}"]
+        assert "center" in peak
+        assert "amplitude" in peak
+        assert "sigma" in peak
+        assert "value" in peak["center"]
+        assert peak["center"]["value"] == pytest.approx(i * 20, abs=0.2)
 
 
 def test_fit_xps():
@@ -148,232 +187,143 @@ def test_fit_xps():
     peak1 = 50 * np.exp(-((x - 40) ** 2) / (2 * 5**2))
     profile = peak1 + np.linspace(10, 5, 500)
 
-    constraints = parameter_contraint(profile, 1, peak_prominence=0.1)
-    peak_labels = ["p1"]
     baseline = (10, 5)
-    result, bg = fit_xps(profile, x, baseline, peak_labels, constraints)
+    fit_result = fit_xps(profile, x, baseline=baseline, num_peaks=1)
 
-    assert result is not None
-    assert isinstance(bg, np.ndarray) and len(bg) == len(profile)
+    assert fit_result["result"] is not None
+    assert fit_result["peak_labels"] == ["p1"]
+    assert isinstance(fit_result["background"], np.ndarray)
+    assert len(fit_result["background"]) == len(profile)
+
+
+def test_fit_xps_with_peak_constraints():
+    """Test XPS fitting with manual nested peak constraints."""
+    x = np.linspace(0, 100, 500)
+    peak1 = 50 * np.exp(-((x - 40) ** 2) / (2 * 5**2))
+    profile = peak1 + np.linspace(10, 5, 500)
+    peak_constraints = {
+        "peak1": {
+            "center": {"value": 40, "min": 35, "max": 45},
+            "sigma": {"value": 5, "min": 1, "max": 10},
+            "amplitude": {"value": 500, "min": 0},
+        }
+    }
+
+    fit_result = fit_xps(
+        profile,
+        x,
+        baseline=(10, 5),
+        peak_constraints=peak_constraints,
+        fit_range=(20, 60),
+    )
+
+    assert fit_result["peak_labels"] == ["peak1"]
+    assert fit_result["range_abscissa"].min() >= 20
+    assert fit_result["range_abscissa"].max() <= 60
+    assert fit_result["result"].best_values["peak1_center"] == pytest.approx(40, abs=1)
 
 
 class TestXPSAnalyzer:
     """Test XPSAnalyzer."""
 
     @pytest.fixture
-    def xps_analyzer(self, xps_raw_file, roi, pixel_per_ev, peak_shift):
+    def xps_analyzer(self, xps_reader, roi, pixel_per_ev, peak_shift):
         """Create an XPSAnalyzer instance."""
-        return XPSAnalyzer(
-            xps_raw_file, roi, pixel_per_ev, peak_shift, incident_voltage=400
-        )
 
-    def test_init(self, xps_analyzer):
-        """Test XPSAnalyzer initialization."""
-
-        assert xps_analyzer.metadata["Incident Voltage"] == (400, "eV")
+        return XPSAnalyzer([xps_reader], roi, pixel_per_ev, peak_shift)
 
     def test_transform_abscissa(self, xps_analyzer):
         """Test transform_abscissa."""
         assert np.array_equal(
-            xps_analyzer.abscissa, 200 - np.linspace(0, 8, 128, endpoint=False)
+            xps_analyzer.get_binding_energy(0),
+            200 - np.linspace(0, 8, 128, endpoint=False),
         )
-        assert xps_analyzer.abscissa_label == "Binding Energy [eV]"
 
     def test_postprocess(self, xps_analyzer):
         """Test postprocess."""
+        kinetic_energy = 200 + np.linspace(0, 8, 128, endpoint=False)
+        binding_energy = 400 - kinetic_energy
 
-        assert np.array_equal(
-            xps_analyzer.KE, 200 + np.linspace(0, 8, 128, endpoint=False)
-        )
-        assert np.array_equal(xps_analyzer.BE, 400 - xps_analyzer.KE)
+        assert np.array_equal(xps_analyzer.get_kinetic_energy(0), kinetic_energy)
+        assert np.array_equal(xps_analyzer.get_binding_energy(0), binding_energy)
 
     def test_fit_method(self, xps_analyzer):
         """Test XPS fitting method."""
+        fit_result = xps_analyzer.fit(0, num_peaks=1, baseline=(200, 100))
 
-        result, bg = xps_analyzer.fit(1, (200, 100))
-
-        assert result is not None
-        assert hasattr(result, "best_fit")
-        assert isinstance(bg, np.ndarray)
+        assert fit_result["result"] is not None
+        assert hasattr(fit_result["result"], "best_fit")
+        assert isinstance(fit_result["background"], np.ndarray)
 
     def test_plot_fit(self, xps_analyzer):
         """Test plotting XPS fit."""
+        fig, ax = plt.subplots()
+        returned_ax = xps_analyzer.plot_profile(
+            0,
+            ax=ax,
+            show_fit=True,
+            num_peaks=1,
+            baseline=(200, 100),
+        )
 
-        model = PseudoVoigtModel(prefix="p1_")
-        params = model.make_params(center=64, amplitude=100, sigma=5, fraction=0.5)
-
-        x = xps_analyzer.pixel
-        bg = np.linspace(10, 5, len(x))
-        result = model.fit(xps_analyzer.profile - bg, x=x, params=params)
-
-        fig, (ax1, ax2) = plt.subplots(2, 1)
-        xps_analyzer.plot_fit((ax1, ax2), result, bg)
-
-        assert len(ax1.get_lines()) > 0 and len(ax2.get_lines()) > 0
+        assert returned_ax is ax
+        assert len(ax.get_lines()) > 0
+        assert len(ax.child_axes) == 1
+        assert len(ax.child_axes[0].get_lines()) > 0
         plt.close(fig)
 
 
 class TestXPSCalibration:
+    """Test XPSCalibration."""
 
     @pytest.fixture
-    def xps_analyzers(self, xps_multiple_raw_files, roi):
-        """Create an XPSAnalyzer instance."""
-        return [
-            ProfileAnalyzer(xps_raw_file, roi)
-            for xps_raw_file in xps_multiple_raw_files
-        ]
+    def xps_calibrator(self, xps_readers, roi):
+        """Create an XPSCalibration instance."""
+        return XPSCalibration(xps_readers, roi)
 
-    def test_calibrate_xps(self, xps_analyzers):
-        """Test calibrate_xps function."""
+    def test_calibrate_xps(self, xps_calibrator):
+        """Test XPSCalibration analyze method."""
 
-        cal_params = {
-            "baselines": [(197, 100)] * 3,
-            "num_peaks": 1,
-            "ref_index": 0,
-            "ref_value": 285.0,
-            "incident_voltage": 400,
-        }
+        result = xps_calibrator.analyze(
+            baselines=[(197, 100)] * 3,
+            num_peaks=1,
+            ref_index=0,
+            ref_value=285.0,
+        )
 
-        cal_result = calibrate_xps(xps_analyzers, cal_params)
-        assert cal_result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
-        assert cal_result["peak_shift"] == pytest.approx(-4, rel=0.1)
+        assert result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
+        assert result["peak_shift"] == pytest.approx(-4, rel=0.1)
 
-    def test_calibrate_xps_metadata_equivalent(self, xps_analyzers):
-        """Supplying the same voltages as analyzer metadata gives identical result."""
-        cal_params = {
-            "baselines": [(197, 100)] * 3,
-            "num_peaks": 1,
-            "ref_index": 0,
-            "ref_value": 285.0,
-            "incident_voltage": 400,
-        }
-        metadata = {"Start Voltage": [114.0, 115.0, 116.0]}
-        cal_result = calibrate_xps(xps_analyzers, cal_params, metadata=metadata)
-        assert cal_result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
-        assert cal_result["peak_shift"] == pytest.approx(-4, rel=0.1)
-
-    def test_calibrate_xps_metadata_overrides(self, xps_analyzers):
-        """Supplying different voltages overrides the analyzer metadata."""
-        cal_params = {
-            "baselines": [(197, 100)] * 3,
-            "num_peaks": 1,
-            "incident_voltage": 400,
-        }
-        # doubling the voltage step should halve pixel_per_ev
-        metadata = {"Start Voltage": [114.0, 116.0, 118.0]}
-        cal_result = calibrate_xps(xps_analyzers, cal_params, metadata=metadata)
-        assert cal_result["pixel_per_ev"] == pytest.approx(8.0, rel=0.1)
-
-    def test_calibrate_ppev_without_reference(self, xps_analyzers):
+    def test_calibrate_ppev_without_reference(self, xps_calibrator):
         """Test calibration with pixel_per_ev."""
-        cal_params = {
-            "baselines": [(197, 100)] * 3,
-            "num_peaks": 1,
-            "pixel_per_ev": 8,
-            "incident_voltage": 400,
-        }
-        cal_result = calibrate_xps(xps_analyzers, cal_params)
-        assert cal_result["pixel_per_ev"] == pytest.approx(8, rel=0.1)
-        # no reference peak adjustment
-        assert np.allclose(cal_result["peak_shift"], 0, rtol=0.1)
+        result = xps_calibrator.analyze(
+            baselines=[(197, 100)] * 3,
+            num_peaks=1,
+            pixel_per_ev=8,
+        )
+        assert result["pixel_per_ev"] == pytest.approx(8, rel=0.1)
+        assert np.allclose(result["peak_shift"], 0, rtol=0.1)
 
-    def test_calibrate_ppev_with_reference(self, xps_analyzers):
+    def test_calibrate_ppev_with_reference(self, xps_calibrator):
         """Test calibration with pixel_per_ev and reference peak."""
-        cal_params = {
-            "baselines": [(197, 100)] * 3,
-            "num_peaks": 1,
-            "pixel_per_ev": 16,
-            "ref_index": 0,
-            "ref_value": 285.0,
-            "incident_voltage": 400,
-        }
-        cal_result = calibrate_xps(xps_analyzers, cal_params)
-        assert np.allclose(cal_result["peak_shift"], -4, rtol=0.1)
-        assert cal_result["pixel_per_ev"] == 16
-
-
-class TestXPSGroup:
-    """Test XPSGroup."""
-
-    @pytest.fixture
-    def xps_group_empty_raises(self, roi, pixel_per_ev, peak_shift):
-        """Create an XPSGroup instance."""
-        with pytest.raises(AssertionError, match="Paths cannot be empty"):
-            XPSGroup([], roi, pixel_per_ev, peak_shift, incident_voltage=400)
-
-
-class TestXPSConfig:
-    """Test XPSConfig class."""
-
-    @pytest.fixture
-    def xps_config_file(self, tmp_path, roi, xps_multiple_raw_files):
-        """Write an XPS TOML config file with ROI, calibration paths and result.
-
-        Here we force the default result to 8.0 pixel_per_ev and 0.0 peak_shift.
-        The calculated result is 16.0 pixel_per_ev and -4.0 peak_shift.
-        """
-        roi_path = tmp_path / "test.roi"
-        roi.to_roi_object().tofile(roi_path)
-
-        path_list = ", ".join(f'"{f.name}"' for f in xps_multiple_raw_files)
-        content = (
-            f'[base]\nroi = "test.roi"\n'
-            f"[calibration]\npaths = [{path_list}]\n"
-            "[calibration.parameters]\n"
-            "num_peaks = 1\n"
-            "baselines = [[197, 100], [197, 100], [197, 100]]\n"
-            "incident_voltage = 400\n"
-            "ref_index = 0\n"
-            "ref_value = 285.0\n"
-            "[calibration.result]\npixel_per_ev = 8.0\npeak_shift = 0.0\n"
+        result = xps_calibrator.analyze(
+            baselines=[(197, 100)] * 3,
+            num_peaks=1,
+            pixel_per_ev=16,
+            ref_index=0,
+            ref_value=285.0,
         )
-        config_path = tmp_path / "xps_config.toml"
-        config_path.write_text(content)
-        return config_path
+        assert np.allclose(result["peak_shift"], -4, rtol=0.1)
+        assert result["pixel_per_ev"] == 16
 
-    def test_calibrate(self, xps_config_file):
-        """Test XPSConfig.calibrate with reset=True runs XPS calibration."""
-
-        result = XPSConfig(xps_config_file).calibrate()
-        assert result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
-        assert result["peak_shift"] == pytest.approx(-4.0, rel=0.1)
-
-        persisted = XPSConfig(xps_config_file).read_section("calibration.result")
-        assert persisted["pixel_per_ev"] == 8.0
-        assert persisted["peak_shift"] == 0.0
-
-    def test_calibrate_update(self, xps_config_file):
-        """Test XPSConfig.calibrate with update=True persists the result."""
-
-        config = XPSConfig(xps_config_file)
-        result = config.calibrate(update=True)
-        assert result["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
-        assert result["peak_shift"] == pytest.approx(-4.0, rel=0.1)
-
-        persisted = config.read_section("calibration.result")
-        assert persisted["pixel_per_ev"] == pytest.approx(16.0, rel=0.1)
-        assert persisted["peak_shift"] == pytest.approx(-4.0, rel=0.1)
-
-    def test_calibrate_with_metadata_section(
-        self, tmp_path, roi, xps_multiple_raw_files
-    ):
-        """[calibration.metadata] overrides start voltages read from analyzer files."""
-        roi_path = tmp_path / "test.roi"
-        roi.to_roi_object().tofile(roi_path)
-
-        path_list = ", ".join(f'"{f.name}"' for f in xps_multiple_raw_files)
-        content = (
-            '[base]\nroi = "test.roi"\n'
-            f"[calibration]\npaths = [{path_list}]\n"
-            "[calibration.parameters]\n"
-            "num_peaks = 1\n"
-            "baselines = [[197, 100], [197, 100], [197, 100]]\n"
-            "incident_voltage = 400\n"
-            # doubling the voltage step should halve pixel_per_ev
-            '[calibration.metadata]\n"Start Voltage" = [114.0, 116.0, 118.0]\n'
+    def test_calibrate_with_peak_shift(self, xps_calibrator):
+        """Test calibration with explicit peak_shift."""
+        result = xps_calibrator.analyze(
+            baselines=[(197, 100)] * 3,
+            num_peaks=1,
+            pixel_per_ev=8,
+            peak_shift=8,
         )
-        config_path = tmp_path / "xps_config_meta.toml"
-        config_path.write_text(content)
 
-        result = XPSConfig(config_path).calibrate()
-        assert result["pixel_per_ev"] == pytest.approx(8.0, rel=0.1)
+        assert result["pixel_per_ev"] == 8
+        assert result["peak_shift"] == 8

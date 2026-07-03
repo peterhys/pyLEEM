@@ -1,105 +1,97 @@
-import tomllib
-import tomlkit
+"""Configuration snapshots for workflow analysis runs.
+
+The file is structured as follows.
+
+.. code-block:: toml
+
+    [session]
+    version = "0.3.0"
+    reader = "UViewReader"
+    roi = "LineROI"
+    analyzer = "XPSAnalyzer"
+
+    [reader]
+    paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
+
+    [roi]
+    roi_file = "line.roi"
+
+    [analyzer]
+    onset = 0
+
+    [task]
+    num_peaks = 1
+    baselines = [[197, 100], [197, 100], [197, 100]]
+    ref_index = 0
+    ref_value = 285.0
+    incident_voltage = 400
+
+    [result]
+    pixel_per_ev = 166.0
+    peak_shift = 3.75
+"""
+
+from copy import deepcopy
 from pathlib import Path
-from functools import reduce
-from pyleem.roi import LineROI
-import glob
 
-
-"""
-The configuration file is a TOML file that outlines the necessary parameters
-in a data folder for analysis. Currently, the file is primarily used to
-store calibration parameters and results.
-
-The file is structured as follows:
-
-[base]
-data_type = "xps"
-roi = "line.roi"
-
-[calibration]
-paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
-
-[calibration.parameters]
-num_peaks = 1
-baselines = [[197, 100], [197, 100], [197, 100]]
-ref_index = 0
-ref_value = 285.0
-incident_voltage = 400
-
-[calibration.result]
-pixel_per_ev = 166.0
-peak_shift = 3.75
-"""
+import tomlkit
 
 
 class Config:
-    """Read and write sections of a TOML configuration file.
+    """Immutable configuration snapshot."""
 
-    :param str or Path config_path: Path to the TOML configuration file.
-    """
+    sections = ("session", "reader", "roi", "analyzer", "task")
+    replace_sections = ("result",)
 
-    def __init__(self, config_path):
-        self.config_path = Path(config_path)
-        self.base_dir = self.config_path.parent
+    def __init__(self, content=None):
+        content = content or {}
+        full_content = {}
 
-    def read_section(self, section=None):
-        """Read a section by section name.
+        for section in self.sections + self.replace_sections:
+            full_content[section] = deepcopy(content.get(section, {}))
 
-        :raises KeyError: If the section does not exist.
-        """
-        with open(self.config_path, "rb") as f:
-            node = tomllib.load(f)
+        object.__setattr__(self, "_content", full_content)
 
-        if section is None:
-            return node
+    def __setattr__(self, name, value):
+        raise AttributeError("Config is immutable. Use with_changes method.")
 
-        return dict(reduce(lambda n, k: n[k], section.split("."), node))
+    def __getattr__(self, name):
+        if name in self.sections + self.replace_sections:
+            return self.content[name]
 
-    def write_section(self, section, data):
-        """Write data to a section by section name.
+        raise AttributeError(name)
 
-        :param str section: Section name.
-        :param dict data: Data to write.
-        """
-        with open(self.config_path, "rb") as f:
-            config = tomlkit.load(f)
+    @property
+    def content(self):
+        """Get a copy of the config content."""
+        return deepcopy(self._content)
 
-        parts = section.split(".")
-        reduce(lambda n, k: n[k], parts[:-1], config)[parts[-1]] = data
+    def with_changes(self, **changes):
+        """Create a new config with changes."""
+        content = self.content
 
-        with open(self.config_path, "w") as f:
-            tomlkit.dump(config, f)
+        for section, values in changes.items():
+            if section not in self.sections + self.replace_sections:
+                raise KeyError(f"Unknown config section: {section}")
 
-    def get_roi(self):
-        """Special function to get the ROI from the configuration file."""
-        if "roi" in self.read_section("base"):
-            return LineROI(roi_file=self.base_dir / self.read_section("base")["roi"])
-        else:
-            raise ValueError("ROI not found in configuration file.")
+            if values is not None:
+                if section in self.replace_sections:
+                    content[section] = deepcopy(values)
+                else:
+                    content[section].update(deepcopy(values))
 
-    def get_paths(self, paths):
-        """Special function to get the paths from the configuration file.
+        return Config(content)
 
-        Adds base directory to the paths.
-        """
-        return [self.base_dir / p for p in paths]
 
-    def get_patterned_paths(self, pattern):
-        """Special function to get the paths from a glob pattern.
+def load_config(path):
+    """Load a configuration file."""
+    path = Path(path)
+    content = tomlkit.parse(path.read_text(encoding="utf-8"))
 
-        The file paths are unsorted.
-        """
-        return glob.glob(str(self.base_dir / pattern))
+    return Config(content)
 
-    def calibrate(self, update=False):
-        """Calibrate using the calibration parameters.
 
-        The subclass should define the calibrate_results method.
-        """
-
-        cal_section = self.read_section("calibration")
-        results = self.calibrate_results(cal_section)
-        if update:
-            self.write_section("calibration.result", results)
-        return results
+def save_config(config, path):
+    """Save a configuration file."""
+    path = Path(path)
+    path.write_text(tomlkit.dumps(config.content), encoding="utf-8")

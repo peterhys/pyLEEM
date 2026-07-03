@@ -2,15 +2,15 @@
 THIRD-PARTY LICENSES
 ================================================================================
 
-This software uses the following third-party Python packages. Each package is
-distributed under its own license, reproduced below. All listed packages are
-permissively licensed and compatible with this project's license terms.
+This software uses the following third-party Python packages and adapted
+code references. Each package or referenced project is distributed under its
+own license, reproduced below. All listed packages and referenced projects
+are permissively licensed and compatible with this project's license terms.
 
-The dependencies listed here are imported at runtime. When this software is
-distributed as source, users install these dependencies separately. When this
-software is distributed in a bundled form (e.g., frozen executable, container
-image, or vendored source tree), the licenses below apply to the bundled
-copies of those dependencies.
+The dependencies listed here are imported at runtime except where noted as a
+source reference. When this software is distributed as source, users install
+these dependencies separately. Referenced projects are included here for
+attribution and license notice.
 
 Contents:
     1. NumPy                (BSD-3-Clause)
@@ -21,6 +21,7 @@ Contents:
     6. tomlkit              (MIT)
     7. roifile              (BSD-3-Clause)
     8. imfit-py (lmfit)     (BSD-3-Clause; incl. SciPy BSD-3 and AMPGO MIT)
+    9. LEEM-analysis drift correction source reference (MIT)
 
 ================================================================================
 1. NumPy
@@ -381,7 +382,7 @@ OTHER DEALINGS IN THE SOFTWARE.
    License: MIT
 ================================================================================
 
-Copyright (c) 2018 Sébastien Eustace
+Copyright (c) 2018 Sebastien Eustace
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -510,6 +511,43 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
 --- Portions derived from the AMPGO library by Andrea Gavana (MIT license) ---
+
+================================================================================
+9. TAdeJong/LEEM-analysis drift correction source reference
+   License: MIT
+================================================================================
+
+Portions of the PyLEEM drift-correction workflow adapt the approach demonstrated
+in the LEEM-analysis drift-correction notebook and Python export.
+
+Source:
+https://github.com/TAdeJong/LEEM-analysis
+
+Relevant files:
+https://github.com/TAdeJong/LEEM-analysis/blob/master/2%20-%20Driftcorrection.ipynb
+https://github.com/TAdeJong/LEEM-analysis/blob/master/2%20-%20Driftcorrection.py
+
+MIT License
+
+Copyright (c) 2019 Tobias A. de Jong
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ================================================================================
 END OF THIRD-PARTY LICENSES

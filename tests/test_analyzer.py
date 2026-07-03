@@ -1,122 +1,222 @@
-import pytest
-from pyleem.analyzer import Analyzer, AnalyzerGroup, ProfileAnalyzer
 import matplotlib.pyplot as plt
+import numpy as np
+import pytest
+from pyleem.analyzer import Analyzer, find_onset
 
 
-class TestAnalyzer:
-    """Test suite for Analyzer class."""
+def test_find_onset():
+    """Test find_onset with 2D images.
 
-    def test_init(self, xps_raw_file):
-        """Test analyzer instantiation and basic properties."""
-        obj = Analyzer(xps_raw_file)
+    Low noise frames followed by signal frames."""
 
-        assert obj.path == xps_raw_file
-        assert obj.name == "test"
-        assert obj.metadata == obj.reader.metadata
+    shape = (20, 20)
+    images = np.zeros((10, *shape))
+    images[:5] = np.random.normal(0.1, 0.1, (5, *shape))
+    images[5:] = np.random.normal(0.1, 0.1, (5, *shape)) + 10  # added signal
 
-    def test_sort(self, tmp_path, metadata_bytes):
-        """Test sorting objects by path."""
-        file1 = tmp_path / "a_test.raw"
-        file2 = tmp_path / "b_test.raw"
-
-        file1.write_bytes(metadata_bytes + b"\xff" * 2000)
-        file2.write_bytes(metadata_bytes + b"\xff" * 2000)
-
-        obj1 = Analyzer(file1)
-        obj2 = Analyzer(file2)
-        assert obj1 < obj2
-
-    def test_plot_image(self, xps_raw_file):
-        """Test plot_image method.
-
-        Plot testing is limited. Here we only test if the run is successful.
-        """
-
-        obj = Analyzer(xps_raw_file)
-
-        # Test with provided axes
-        fig, ax = plt.subplots()
-        obj.plot_image(ax=ax)
-        assert len(ax.images) == 1
-        plt.close(fig)
-
-        # Test without axes (creates its own)
-        obj.plot_image(ax=None)
-        assert len(plt.get_fignums()) == 1
-        plt.close("all")
+    onset_idx = find_onset(images)
+    assert onset_idx == 4
 
 
-class TestProfileAnalyzer:
-    """Test suite for ProfileAnalyzer class."""
+@pytest.fixture
+def mock_analyzer():
 
-    def test_corrdinates(self, xps_raw_file, roi):
-        """Test coordinates transformation."""
-        obj = ProfileAnalyzer(xps_raw_file, roi)
-        assert obj.abscissa_label == "Pixel"
-        assert obj.ordinate_label == "Intensity"
+    class AnnotatedAnalyzer(Analyzer):
+        """Analyzer subclass for testing processed images and overlays."""
 
-    def test_plot_profile(self, xps_raw_file, roi):
-        """Test plot_profile method.
+        def __init__(self, *args, **kwargs):
+            self.annotation_indexes = []
+            super().__init__(*args, **kwargs)
 
-        Plot testing is limited. Here we only test if the run is successful.
-        """
-        obj = ProfileAnalyzer(xps_raw_file, roi)
+        def get_processed_image(self, index):
+            """Return a visibly processed image."""
+            return self.get_raw_image(index) + 1
 
-        # Test with provided axes
-        fig, ax = plt.subplots()
-        obj.plot_profile(ax=ax)
-        assert len(ax.lines) == 1
-        plt.close(fig)
+        def get_annotated_image(self, index):
+            """Return a visibly annotated image."""
+            return self.get_raw_image(index) + 2
 
-        # Test without axes (creates its own)
-        obj.plot_profile(ax=None)
-        assert len(plt.get_fignums()) == 1
-        plt.close("all")
+        def annotate_image(self, index, ax):
+            """Draw a simple overlay."""
+            self.annotation_indexes.append(index)
+            ax.axhline(0, color="red")
+            return ax
+
+    return AnnotatedAnalyzer
 
 
-class TestAnalyzerGroup:
-    """Test suite for AnalyzerGroup class."""
+def test_analyzer_readers(xps_readers):
+    """Test Analyzer stores the reader list."""
+    analyzer = Analyzer(xps_readers)
 
-    @pytest.fixture
-    def analyzer_group(self, xps_multiple_raw_files):
-        """Create an AnalyzerGroup for testing."""
-        return AnalyzerGroup([Analyzer(path) for path in xps_multiple_raw_files])
+    assert analyzer.readers == xps_readers
 
-    def test_iter(self, analyzer_group):
-        """Test iteration yields all analyzer instances."""
 
-        assert len(analyzer_group) == 3
+def test_analyzer_raises():
+    """Test Analyzer requires at least one reader."""
+    with pytest.raises(ValueError, match="readers cannot be empty"):
+        Analyzer([])
 
-    def test_getitem(self, analyzer_group):
-        """Test indexing returns the correct analyzer."""
-        assert analyzer_group[0] is analyzer_group.analyzers[0]
 
-    def test_get_metas(self, analyzer_group):
-        """Test get_metas returns a value for each file."""
-        voltages = analyzer_group.get_metas("Start Voltage")
-        assert voltages == [114.0, 115.0, 116.0]
+def test_analyzer_onset(xps_readers):
+    """Test Analyzer onset slices readers."""
+    analyzer = Analyzer(xps_readers, onset=1)
 
-    def test_get_attrs(self, analyzer_group):
-        """Test get_attrs returns the named attribute from each analyzer."""
+    assert analyzer.onset == 1
+    assert analyzer.readers == xps_readers[1:]
 
-        names = analyzer_group.get_attrs("name")
-        assert names == [a.name for a in analyzer_group.analyzers]
 
-    def test_get_time_intervals(self, analyzer_group):
-        """Test that time_intervals starts at 0 and has the correct length.
+def test_analyzer_indices(xps_readers):
+    """Test Analyzer indices match the active reader list."""
+    analyzer = Analyzer(xps_readers)
+    onset_analyzer = Analyzer(xps_readers, onset=1)
 
-        The files are temporary files, so the time intervals are very small.
-        """
-        intervals = analyzer_group.get_time_intervals()
-        assert len(intervals) == 3
-        assert intervals[0] == 0
-        assert intervals[1] == 60
-        assert intervals[2] == 120
+    assert list(analyzer.indices) == [0, 1, 2]
+    assert list(onset_analyzer.indices) == [0, 1]
 
-    def test_find_onset_profiles(self, noisy_raw_file, xps_multiple_raw_files):
-        """Test find_onset on a profile-based group returns a valid index."""
-        files = [noisy_raw_file, noisy_raw_file] + xps_multiple_raw_files
-        analyzer_group = AnalyzerGroup([Analyzer(path) for path in files])
 
-        onset = analyzer_group.find_onset()
-        assert onset == 1
+def test_analyzer_onset_raises(xps_reader):
+    """Test Analyzer onset raises if no readers after slicing."""
+    with pytest.raises(ValueError, match="readers empty after onset"):
+        Analyzer([xps_reader], onset=1)
+
+
+def test_analyzer_onset_auto(create_reader):
+    """Test Analyzer can derive onset from image intensity."""
+    images = [
+        np.ones((256, 128), dtype=np.uint16),
+        np.ones((256, 128), dtype=np.uint16) * 2,
+        np.ones((256, 128), dtype=np.uint16) * 20,
+    ]
+    readers = [
+        create_reader(f"onset_{index}.dat", image)
+        for index, image in enumerate(images)
+    ]
+
+    analyzer = Analyzer(readers, onset=None)
+
+    assert analyzer.onset == 1
+    assert analyzer.readers == readers[1:]
+
+
+def test_analyzer_get_image(xps_reader, mock_analyzer):
+    """Test get_image dispatches raw and processed images."""
+    analyzer = mock_analyzer([xps_reader])
+
+    assert np.array_equal(analyzer.get_raw_image(0), xps_reader.image)
+    assert np.array_equal(analyzer.get_processed_image(0), xps_reader.image + 1)
+
+
+def test_analyzer_plot_image(xps_reader, mock_analyzer):
+    """Test plot_image draws the processed image."""
+    analyzer = mock_analyzer([xps_reader])
+    fig, ax = plt.subplots()
+
+    # default, processed image
+    analyzer.plot_image(0, ax=ax)
+
+    plotted = np.asarray(ax.images[0].get_array())
+    assert np.array_equal(plotted, xps_reader.image + 1)
+    plt.close(fig)
+
+
+def test_analyzer_plot_image_annotated(xps_reader, mock_analyzer):
+    """Test plot_image calls annotate_image for annotated images."""
+    analyzer = mock_analyzer([xps_reader])
+    fig, ax = plt.subplots()
+
+    returned = analyzer.plot_image(0, ax=ax, annotate=True)
+
+    assert returned is ax
+    assert analyzer.annotation_indexes == [0]
+    assert len(ax.lines) == 1
+    plt.close(fig)
+
+
+def test_analyzer_get_autolevel(xps_reader):
+    """Test autolevel returns percentile display limits."""
+    analyzer = Analyzer([xps_reader])
+    image = np.arange(101, dtype=float).reshape(1, 101)
+
+    vmin, vmax = analyzer.get_autolevel(image)
+
+    assert vmin == pytest.approx(1)
+    assert vmax == pytest.approx(99)
+
+
+def test_analyzer_plot_image_autolevel(create_reader, mock_analyzer):
+    """Test plot_image autolevel changes display limits only."""
+    image = np.arange(256 * 128, dtype=np.uint16).reshape(256, 128)
+    reader = create_reader("autolevel.dat", image)
+    analyzer = mock_analyzer([reader])
+    fig, ax = plt.subplots()
+
+    analyzer.plot_image(0, ax=ax, autolevel=True)
+
+    plotted = np.asarray(ax.images[0].get_array())
+    expected_image = image + 1
+    expected_limits = np.percentile(expected_image, [1, 99])
+
+    assert np.array_equal(plotted, expected_image)
+    assert ax.images[0].get_clim() == pytest.approx(tuple(expected_limits))
+    plt.close(fig)
+
+
+def test_analyzer_get_measurement(xps_reader, roi, mock_analyzer):
+    """Test get_measurement measures the processed image by default."""
+    analyzer = mock_analyzer([xps_reader], roi=roi)
+
+    measurement = analyzer.get_measurement(0)
+    assert np.array_equal(measurement.profile, xps_reader.image[0, :] + 1)
+
+
+def test_analyzer_get_profile(xps_reader, roi, mock_analyzer):
+    """Test get_profile returns the ROI measurement profile."""
+    analyzer = mock_analyzer([xps_reader], roi=roi)
+
+    profile = analyzer.get_profile(0)
+
+    assert np.array_equal(profile, xps_reader.image[0, :] + 1)
+
+
+def test_analyzer_get_pixel(xps_reader, roi, mock_analyzer):
+    """Test get_pixel returns profile pixel positions."""
+    analyzer = mock_analyzer([xps_reader], roi=roi)
+
+    pixel = analyzer.get_pixel(0)
+
+    assert np.array_equal(pixel, np.arange(128))
+
+
+def test_analyzer_get_pixel_raises(xps_reader, mock_analyzer):
+    """Test get_pixel raises when profile is not available."""
+    analyzer = mock_analyzer([xps_reader])
+    analyzer.get_profile = lambda index: None
+
+    with pytest.raises(ValueError, match="Profile is not available"):
+        analyzer.get_pixel(0)
+
+
+def test_analyzer_get_metadata(xps_readers):
+    """Test get_metadata returns metadata values without units."""
+    analyzer = Analyzer(xps_readers)
+
+    assert analyzer.get_metadata("Start Voltage", 0) == (114.0, "V")
+    assert analyzer.get_metadata("Start Voltage", 1) == (115.0, "V")
+    assert analyzer.get_metadata("Start Voltage", 2) == (116.0, "V")
+
+
+def test_analyzer_unimplemented(xps_reader):
+    """Test base Analyzer raises if method is not implemented."""
+    analyzer = Analyzer([xps_reader])
+
+    with pytest.raises(
+        NotImplementedError, match="'analyze' method is not implemented"
+    ):
+        analyzer.analyze()
+
+
+def test_analyzer_subclasses_registry(mock_analyzer):
+    """Test Analyzer subclasses are registered in the registry."""
+    assert Analyzer.REGISTRY["AnnotatedAnalyzer"] is mock_analyzer
+    assert Analyzer.REGISTRY["Analyzer"] is Analyzer
