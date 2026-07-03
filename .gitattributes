@@ -1,0 +1,2 @@
+# Keep example notebooks out of GitHub language statistics.
+*.ipynb linguist-documentation linguist-detectable=false
