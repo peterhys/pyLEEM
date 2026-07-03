@@ -145,4 +145,3 @@ def test_relative_shifts_raises():
 
     with pytest.raises(ValueError, match="max_distance must be at least 1"):
         relative_shifts(images, max_distance=0)
-
