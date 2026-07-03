@@ -6,7 +6,7 @@ from pyleem.operation.drift import calculate_drift
 from scipy.ndimage import shift
 
 
-class FullFieldAnalyzer(Analyzer):
+class FullFieldBase(Analyzer):
     """Analyzer for full-field image stacks.
 
     A typical step of the full-field analysis is to correct image drift (transform)

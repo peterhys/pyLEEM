@@ -1,10 +1,10 @@
 # XAS Analysis
 
 X-ray Absorption Spectroscopy (XAS) analysis measures ROI intensity across an
-image stack. Drift correction is available as an explicit step before intensity
+image stack. {py:class}`~pyleem.analysis.xas.XASAnalyzer` is the analyzer for XAS analysis. Drift correction is available as an explicit step before intensity
 extraction. If `correct_drift` method is not called, the raw image is used for
 analysis. The shift information can be separately accessed from the method
-`calculate_drift()`.
+`calculate_drift()`. The analyzer uses the {py:class}`~pyleem.analysis.fullfield.FullFieldBase` base class for drift correction logics.
 
 ## Example
 

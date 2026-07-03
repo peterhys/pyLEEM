@@ -1,8 +1,8 @@
-from pyleem.analysis.fullfield import FullFieldAnalyzer
+from pyleem.analysis.fullfield import FullFieldBase
 import matplotlib.pyplot as plt
 
 
-class LEEMIVAnalyzer(FullFieldAnalyzer):
+class LEEMIVAnalyzer(FullFieldBase):
     """Analyzer for LEEM-IV image stacks.
 
     A typical step of the LEEM-IV analysis is to correct image drift (transform)

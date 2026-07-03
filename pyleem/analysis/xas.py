@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
-from pyleem.analysis.fullfield import FullFieldAnalyzer
+from pyleem.analysis.fullfield import FullFieldBase
 
 
-class XASAnalyzer(FullFieldAnalyzer):
+class XASAnalyzer(FullFieldBase):
     """Analyzer for X-ray absorption image stacks.
 
     A typical step of the XAS analysis is to correct image drift (transform)
