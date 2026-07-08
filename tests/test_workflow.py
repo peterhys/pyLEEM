@@ -4,7 +4,7 @@ from pyleem.analyzer import Analyzer
 from pyleem.config import Config, load_config
 from pyleem.reader import UViewReader
 from pyleem.roi import LineROI
-from pyleem.workflow import Workflow, get_metadata_list, get_reader_paths, resolve_path
+from pyleem.workflow import Workflow, get_reader_paths, resolve_path
 
 
 @pytest.fixture
@@ -135,31 +135,6 @@ def test_get_reader_paths_raises(tmp_path):
         ValueError, match="Reader requires either paths or path_pattern."
     ):
         get_reader_paths(config.reader, tmp_path)
-
-
-def test_get_metadata_list():
-    """Test get_metadata_list merges shared and per-reader metadata."""
-    metadata_list = get_metadata_list(
-        {
-            "metadata": {"fov": (5, "um"), "voltage": (400, "eV")},
-            "metadata_list": [
-                {"fov": (10, "um")},
-                {},
-                {"voltage": (402, "eV")},
-            ],
-        },
-        3,
-    )
-
-    assert metadata_list == [
-        {"fov": (10, "um"), "voltage": (400, "eV")},
-        {"fov": (5, "um"), "voltage": (400, "eV")},
-        {"fov": (5, "um"), "voltage": (402, "eV")},
-    ]
-
-    metadata_list[0]["extra"] = "value"
-    assert "extra" not in metadata_list[1]
-    assert "extra" not in metadata_list[2]
 
 
 def test_workflow_builds(tmp_path, xps_multiple_raw_files, roi_file, mock_analyzer):

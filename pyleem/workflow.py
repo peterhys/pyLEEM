@@ -24,27 +24,6 @@ def get_reader_paths(reader_content, root):
     raise ValueError("Reader requires either paths or path_pattern.")
 
 
-def get_metadata_list(reader_content, length):
-    """Return the metadata list from the reader content.
-
-    Allow configuration to apply the same metadata to all readers.
-    The individual reader metadata overrides the overall metadata.
-    The behavior is allowed but not recommended.
-    """
-
-    metadata_list = [{} for _ in range(length)]
-
-    if "metadata" in reader_content:
-        for metadata in metadata_list:
-            metadata.update(reader_content["metadata"])
-
-    if "metadata_list" in reader_content:
-        for index, metadata in enumerate(reader_content["metadata_list"]):
-            metadata_list[index].update(metadata)
-
-    return metadata_list
-
-
 class Workflow:
     """Build and run analyzers from Config content.
 
@@ -68,10 +47,14 @@ class Workflow:
         """Resolve path and build readers."""
         reader_class = Reader.REGISTRY[self.config.session["reader"]]
         paths = get_reader_paths(self.config.reader, self.root)
-        metadata_list = get_metadata_list(self.config.reader, len(paths))
-        onset = self.config.reader.get("onset", 0)
 
-        return read_files(paths, reader_class, metadata_list=metadata_list, onset=onset)
+        reader_config = {
+            key: value
+            for key, value in self.config.reader.items()
+            if key not in ["paths", "path_pattern"]
+        }
+
+        return read_files(paths, reader_class, **reader_config)
 
     def build_roi(self):
         """Build the ROI from the configuration."""

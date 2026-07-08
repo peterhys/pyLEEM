@@ -13,6 +13,7 @@ Workflow improvements.
 
 - The `onset` parameter is part of the `read_files` function.
 - The `find_onset` function returns the index of the profile after the image rise.
+- `read_files` takes both `metadata` and `metadata_list` parameters.
 
 
 ## [0.3.0]

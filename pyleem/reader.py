@@ -140,7 +140,9 @@ def find_onset(profiles):
     return np.argmax(profile_diff) + 1
 
 
-def read_files(paths, reader_cls=UViewReader, metadata_list=None, onset=0):
+def read_files(
+    paths, reader_cls=UViewReader, metadata_list=None, metadata=None, onset=0
+):
     """Read a list of files and add time intervals metadata.
 
     Additional metadata can be added to the readers with the
@@ -149,6 +151,7 @@ def read_files(paths, reader_cls=UViewReader, metadata_list=None, onset=0):
     TimeInterval metadata, however, is added directly.
     """
     metadata_list = metadata_list or [{}] * len(paths)
+    metadata = metadata or {}
     readers = [reader_cls(path) for path in paths]
 
     if onset is None:
@@ -162,5 +165,6 @@ def read_files(paths, reader_cls=UViewReader, metadata_list=None, onset=0):
     time_intervals = get_time_intervals(readers)
     for i, time_interval in enumerate(time_intervals):
         readers[i].update_metadata({"TimeInterval": (time_interval, "s")})
+        readers[i].update_metadata(metadata)
         readers[i].update_metadata(metadata_list[i])
     return readers
