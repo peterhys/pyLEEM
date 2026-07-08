@@ -290,14 +290,14 @@ class DESPAnalyzer(DESPAnalyzerBase):
 
         return ax
 
-    def plot_energy(self, ax=None):
+    def plot_energy(self, ax=None, **kwargs):
         """Plot the energy vs. time.
 
         :param matplotlib.axes.Axes ax: Matplotlib axes object.
         """
         ax = ax or plt.gca()
         time_intervals = [reader.metadata["TimeInterval"][0] for reader in self.readers]
-        ax.plot(time_intervals, self.energy_array)
+        ax.plot(time_intervals, self.energy_array, **kwargs)
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Electron Energy [eV]")
 
