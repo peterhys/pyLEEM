@@ -1,21 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
-from pyleem.analyzer import Analyzer, find_onset
-
-
-def test_find_onset():
-    """Test find_onset with 2D images.
-
-    Low noise frames followed by signal frames."""
-
-    shape = (20, 20)
-    images = np.zeros((10, *shape))
-    images[:5] = np.random.normal(0.1, 0.1, (5, *shape))
-    images[5:] = np.random.normal(0.1, 0.1, (5, *shape)) + 10  # added signal
-
-    onset_idx = find_onset(images)
-    assert onset_idx == 4
+from pyleem.analyzer import Analyzer
 
 
 @pytest.fixture
@@ -58,45 +44,11 @@ def test_analyzer_raises():
         Analyzer([])
 
 
-def test_analyzer_onset(xps_readers):
-    """Test Analyzer onset slices readers."""
-    analyzer = Analyzer(xps_readers, onset=1)
-
-    assert analyzer.onset == 1
-    assert analyzer.readers == xps_readers[1:]
-
-
 def test_analyzer_indices(xps_readers):
     """Test Analyzer indices match the active reader list."""
     analyzer = Analyzer(xps_readers)
-    onset_analyzer = Analyzer(xps_readers, onset=1)
 
     assert list(analyzer.indices) == [0, 1, 2]
-    assert list(onset_analyzer.indices) == [0, 1]
-
-
-def test_analyzer_onset_raises(xps_reader):
-    """Test Analyzer onset raises if no readers after slicing."""
-    with pytest.raises(ValueError, match="readers empty after onset"):
-        Analyzer([xps_reader], onset=1)
-
-
-def test_analyzer_onset_auto(create_reader):
-    """Test Analyzer can derive onset from image intensity."""
-    images = [
-        np.ones((256, 128), dtype=np.uint16),
-        np.ones((256, 128), dtype=np.uint16) * 2,
-        np.ones((256, 128), dtype=np.uint16) * 20,
-    ]
-    readers = [
-        create_reader(f"onset_{index}.dat", image)
-        for index, image in enumerate(images)
-    ]
-
-    analyzer = Analyzer(readers, onset=None)
-
-    assert analyzer.onset == 1
-    assert analyzer.readers == readers[1:]
 
 
 def test_analyzer_get_image(xps_reader, mock_analyzer):

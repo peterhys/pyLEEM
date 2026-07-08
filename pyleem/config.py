@@ -12,12 +12,10 @@ The file is structured as follows.
 
     [reader]
     paths = ["data_0eV.dat", "data_1eV.dat", "data_2eV.dat"]
+    onset = 0
 
     [roi]
     roi_file = "line.roi"
-
-    [analyzer]
-    onset = 0
 
     [task]
     num_peaks = 1

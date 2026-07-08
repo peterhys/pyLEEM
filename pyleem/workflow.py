@@ -69,8 +69,9 @@ class Workflow:
         reader_class = Reader.REGISTRY[self.config.session["reader"]]
         paths = get_reader_paths(self.config.reader, self.root)
         metadata_list = get_metadata_list(self.config.reader, len(paths))
+        onset = self.config.reader.get("onset", 0)
 
-        return read_files(paths, reader_class, metadata_list=metadata_list)
+        return read_files(paths, reader_class, metadata_list=metadata_list, onset=onset)
 
     def build_roi(self):
         """Build the ROI from the configuration."""

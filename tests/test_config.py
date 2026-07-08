@@ -11,12 +11,10 @@ analyzer = "XPSAnalyzer"
 
 [reader]
 paths = ["test_raw_0.dat", "test_raw_1.dat", "test_raw_2.dat"]
+onset = 0
 
 [roi]
 roi_file = "test.roi"
-
-[analyzer]
-onset = 0
 
 [task]
 num_peaks = 1
@@ -83,10 +81,11 @@ def test_load_config_properties(config_file):
         "analyzer": "XPSAnalyzer",
     }
     assert config.reader == {
-        "paths": ["test_raw_0.dat", "test_raw_1.dat", "test_raw_2.dat"]
+        "paths": ["test_raw_0.dat", "test_raw_1.dat", "test_raw_2.dat"],
+        "onset": 0,
     }
     assert config.roi == {"roi_file": "test.roi"}
-    assert config.analyzer == {"onset": 0}
+    assert config.analyzer == {}
     assert config.task == {"num_peaks": 1, "incident_voltage": 400}
     assert config.result == {"pixel_per_ev": 16.0, "peak_shift": 0.0}
 

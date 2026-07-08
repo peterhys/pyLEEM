@@ -5,12 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Workflow improvements.
+
+### Changed
+
+- The `onset` parameter is part of the `read_files` function.
+- The `find_onset` function returns the index of the profile after the image rise.
+
 
 ## [0.3.0]
 
 Improve the repository architecture and simplify the API. Breaking changes included.
 
-## Changed
+### Changed
 
 - Reader class now takes care of raw file interaction (image and metadata).
 - Analyzer now takes care of domain specific analysis.
@@ -20,7 +29,7 @@ Improve the repository architecture and simplify the API. Breaking changes inclu
 - Update domain specific analyzers. 
 - Improved XPS fitting workflow to allow for manual fitting input in the class method.
 
-## Added
+### Added
 
 - ReaderGroup class that adds time interval to the metadata.
 - Analyzer workflow now more explicit for reproducibility.
@@ -32,7 +41,7 @@ Improve the repository architecture and simplify the API. Breaking changes inclu
 - Add drift correction algorithm for LEEM and XAS measurements.
 - Add example.ipynb for analysis examples.
 
-## Removed
+### Removed
 
 - Remove `AnalyzerGroup` class and associated domain specific group analyzers.
 - Remove `StitchAnalyzer` class and moved stitch functionality to the

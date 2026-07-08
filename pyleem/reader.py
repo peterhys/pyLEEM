@@ -122,7 +122,25 @@ def get_time_intervals(readers):
     return [timedelta.total_seconds() for timedelta in timedelta_list]
 
 
-def read_files(paths, reader_cls=UViewReader, metadata_list=None):
+def find_onset(profiles):
+    """Find the onset of a profile.
+
+    The profiles can be full images or line profiles.
+    Here we look at the "relative difference". The
+    np.gradient is not used because it tracks two steps at a time.
+
+    :param list profiles: List of profiles to find the onset of.
+    :return: Index of the profile with the steepest rise.
+    :rtype: int
+    """
+
+    profile_sums = np.array([profile.sum() for profile in profiles], dtype=np.float64)
+    profile_diff = np.diff(profile_sums) / profile_sums[:-1]
+
+    return np.argmax(profile_diff) + 1
+
+
+def read_files(paths, reader_cls=UViewReader, metadata_list=None, onset=0):
     """Read a list of files and add time intervals metadata.
 
     Additional metadata can be added to the readers with the
@@ -130,10 +148,17 @@ def read_files(paths, reader_cls=UViewReader, metadata_list=None):
 
     TimeInterval metadata, however, is added directly.
     """
-
     metadata_list = metadata_list or [{}] * len(paths)
-
     readers = [reader_cls(path) for path in paths]
+
+    if onset is None:
+        onset = find_onset([reader.image for reader in readers])
+    elif onset < 0:
+        raise ValueError("onset cannot be negative")
+
+    readers = readers[onset:]
+    metadata_list = metadata_list[onset:]
+
     time_intervals = get_time_intervals(readers)
     for i, time_interval in enumerate(time_intervals):
         readers[i].update_metadata({"TimeInterval": (time_interval, "s")})

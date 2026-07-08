@@ -377,14 +377,12 @@ class XPSAnalyzer(SpectraBase):
     :param ROI roi: Region of interest for profile extraction.
     :param float pixel_per_ev: Pixel per eV.
     :param float peak_shift: Peak shift.
-    :param int onset: Onset index.
     """
 
-    def __init__(self, readers, roi, pixel_per_ev, peak_shift, onset=0):
+    def __init__(self, readers, roi, pixel_per_ev, peak_shift):
         super().__init__(
             readers,
             roi=roi,
-            onset=onset,
             pixel_per_ev=pixel_per_ev,
             peak_shift=peak_shift,
         )

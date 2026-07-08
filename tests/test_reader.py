@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pytest
 
-from pyleem.reader import UViewReader, read_files, get_time_intervals
+from pyleem.reader import UViewReader, read_files, get_time_intervals, find_onset
 
 
 @pytest.fixture
@@ -75,6 +75,48 @@ def test_read_files_metadata_list(xps_multiple_raw_files):
     assert readers[0].metadata["Start Voltage"] == (2.0, "eV")
     assert readers[1].metadata["Start Voltage"] == (4.0, "eV")
     assert readers[2].metadata["Start Voltage"] == (6.0, "eV")
+
+
+def test_find_onset():
+    """Test find_onset with 2D images.
+
+    Low noise frames followed by signal frames."""
+
+    shape = (20, 20)
+    images = np.zeros((10, *shape))
+    images[:5] = np.random.normal(0.1, 0.1, (5, *shape))
+    images[5:] = np.random.normal(0.1, 0.1, (5, *shape)) + 10  # added signal
+
+    onset_idx = find_onset(images)
+    assert onset_idx == 5
+
+
+def test_read_files_onset(xps_multiple_raw_files):
+    """Test read_files onset slices readers."""
+    readers = read_files(xps_multiple_raw_files, UViewReader, onset=1)
+
+    assert len(readers) == 2
+    assert [reader.path for reader in readers] == xps_multiple_raw_files[1:]
+
+
+def test_read_files_onset_auto(create_reader):
+    """Test read_files can derive onset from image intensity."""
+    images = [
+        np.ones((256, 128), dtype=np.uint16),
+        np.ones((256, 128), dtype=np.uint16) * 2,
+        np.ones((256, 128), dtype=np.uint16) * 20,
+    ]
+    expected_readers = [
+        create_reader(f"onset_{index}.dat", image) for index, image in enumerate(images)
+    ]
+
+    readers = read_files(
+        [reader.path for reader in expected_readers], UViewReader, onset=None
+    )
+
+    assert [reader.path for reader in readers] == [
+        reader.path for reader in expected_readers[2:]
+    ]
 
 
 def test_reader_plot_image(reader):

@@ -3,24 +3,6 @@ from pyleem.roi import NoROI
 import numpy as np
 
 
-def find_onset(profiles):
-    """Find the onset of a profile.
-
-    The profiles can be full images or line profiles.
-    Here we look at the "relative difference". The
-    np.gradient is not used because it tracks two steps at a time.
-
-    :param list profiles: List of profiles to find the onset of.
-    :return: Index of the profile with the steepest rise.
-    :rtype: int
-    """
-
-    profile_sums = np.array([profile.sum() for profile in profiles], dtype=np.float64)
-    profile_diff = np.diff(profile_sums) / profile_sums[:-1]
-
-    return np.argmax(profile_diff)
-
-
 class Analyzer:
     """Base analyzer class for LEEM data analysis.
 
@@ -31,9 +13,8 @@ class Analyzer:
     All variable access should be index aware.
 
     :param iterable readers: Reader objects used by the analyzer.
-    :ivar list readers: List of readers after onset.
+    :ivar list readers: List of readers.
     :ivar ROI roi: ROI for measuring the image.
-    :ivar int onset: Index of the onset of the image.
     """
 
     REGISTRY = {}
@@ -43,18 +24,13 @@ class Analyzer:
         super().__init_subclass__(**kwargs)
         cls.REGISTRY[cls.__name__] = cls
 
-    def __init__(self, readers, roi=None, onset=0):
+    def __init__(self, readers, roi=None):
 
         if not readers:
             raise ValueError("readers cannot be empty")
 
-        if onset is None:
-            onset = find_onset([reader.image for reader in readers])
-        self.onset = onset
+        self.readers = readers
 
-        self.readers = readers[self.onset :]
-        if not self.readers:
-            raise ValueError("readers empty after onset")
         self.roi = roi or NoROI()
         self.indices = range(len(self.readers))
 

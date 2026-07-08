@@ -70,8 +70,8 @@ class SEESAnalyzer(SEESBase):
     :ivar float surface_potential: Measured surface potential in V.
     """
 
-    def __init__(self, readers, roi, pixel_per_ev, peak_shift, onset=0, sigma=10):
-        super().__init__(readers, roi=roi, onset=onset)
+    def __init__(self, readers, roi, pixel_per_ev, peak_shift, sigma=10):
+        super().__init__(readers, roi=roi)
 
         self.pixel_per_ev = pixel_per_ev
         self.peak_shift = peak_shift

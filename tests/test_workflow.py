@@ -14,8 +14,8 @@ def mock_analyzer():
 
         save_keys = ("reader_count", "sigma")
 
-        def __init__(self, readers, roi=None, onset=0, scale=1):
-            super().__init__(readers=readers, roi=roi, onset=onset)
+        def __init__(self, readers, roi=None, scale=1):
+            super().__init__(readers=readers, roi=roi)
             self.scale = scale
             self.parameters = None
             self.runtime_result = object()

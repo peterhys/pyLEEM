@@ -164,13 +164,12 @@ class DESPAnalyzerBase(Analyzer):
         self,
         readers,
         roi=None,
-        onset=0,
         gaussian_kernel=3,
         gaussian_sigma=0,
         use_morph=True,
         morph_kernel=3,
     ):
-        super().__init__(readers, roi=roi, onset=onset)
+        super().__init__(readers, roi=roi)
         self.gaussian_kernel = gaussian_kernel
         self.gaussian_sigma = gaussian_sigma
         self.use_morph = use_morph
@@ -200,7 +199,7 @@ class DESPCalibration(DESPAnalyzerBase):
 
     save_keys = ("parabola_params",)
 
-    def analyze(self, window):
+    def analyze(self, window=None):
         """Calibrate radius to potential using multiple images.
 
         Uses linear interpolation to map pattern radii to electron energies.
