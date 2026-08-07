@@ -48,7 +48,7 @@ A second design goal is workflow readability and reproducibility. Domain-specifi
 
 # Research impact statement
 
-`pyLEEM` has supported both user-facility data analysis and method development. For the core developers, the package enables rapid development, testing, and validation of new workflows and analysis algorithms, including DESP calibration and characterization. More broadly, `pyLEEM` was developed at the Center for Functional Nanomaterials (CFN), a U.S. Department of Energy Office of Science user facility at Brookhaven National Laboratory. As a user facility, the CFN serves a broad community of visiting researchers, and `pyLEEM` has supported and continues to support users' data analysis at both the CFN and the National Synchrotron Light Source II (NSLS-II). [@Patel2025aug; @Patel2025dec]
+`pyLEEM` has supported both user-facility data analysis and method development. For the core developers, the package enables rapid development, testing, and validation of new workflows and analysis algorithms, including DESP calibration and characterization. More broadly, `pyLEEM` was developed at the Center for Functional Nanomaterials (CFN), a U.S. Department of Energy Office of Science user facility at Brookhaven National Laboratory. As a user facility, the CFN serves a broad community of visiting researchers, and `pyLEEM` has supported and continues to support users' data analysis at both the CFN and the National Synchrotron Light Source II (NSLS-II) [@Patel2025aug; @Patel2025dec].
 
 # AI usage disclosure
 
