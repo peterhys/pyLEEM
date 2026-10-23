@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Workflow improvements.
+This update includes workflow improvements and experiment naming changes, which breaks
+the previous API.
 
 ### Changed
 
+- Rename `pyleem.analysis.desp` to `pyleem.analysis.leeder` for LEED Ewald
+  radius analysis (LEEDER). Rename `DESPAnalyzerBase`, `DESPAnalyzer`, and
+  `DESPCalibration` to `LEEDERAnalyzerBase`, `LEEDERAnalyzer`, and
+  `LEEDERCalibration`. 
 - The `onset` parameter is part of the `read_files` function.
 - The `find_onset` function returns the index of the profile after the image rise.
 - `read_files` takes both `metadata` and `metadata_list` parameters.
