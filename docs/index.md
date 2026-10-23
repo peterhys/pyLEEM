@@ -30,7 +30,7 @@ analysis/leem
 analysis/xas
 analysis/xps
 analysis/sees
-analysis/desp
+analysis/leeder
 ```
 
 ```{toctree}
@@ -76,7 +76,7 @@ ref/spectra_ref
 ref/leem_ref
 ref/xas_ref
 ref/sees_ref
-ref/desp_ref
+ref/leeder_ref
 ref/xps_ref
 ```
 

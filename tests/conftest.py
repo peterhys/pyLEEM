@@ -332,33 +332,33 @@ def sees_readers(sees_multiple_raw_files):
 
 
 @pytest.fixture
-def desp_radius_to_energy_func():
+def leeder_radius_to_energy_func():
     """Create a potential function."""
     return lambda x: 0.01 * x**2 + 5
 
 
 @pytest.fixture
-def desp_files(tmp_path, metadata_bytes, desp_radius_to_energy_func):
-    """Create multiple DESP raw files with different circle radii."""
+def leeder_files(tmp_path, metadata_bytes, leeder_radius_to_energy_func):
+    """Create multiple LEEDER raw files with different circle radii."""
     files = []
 
     for i in range(3):
         modified_metadata = set_start_voltage(
-            metadata_bytes, desp_radius_to_energy_func(20 + i * 20)
+            metadata_bytes, leeder_radius_to_energy_func(20 + i * 20)
         )
         image = np.zeros((256, 128), dtype=np.uint16)
         cv2.circle(image, (64, 128), 20 + i * 20, 1000, -1)
 
-        desp_file = tmp_path / f"test_desp_{i}.dat"
-        desp_file.write_bytes(modified_metadata + b"\xff" * 2000 + image.tobytes())
-        files.append(desp_file)
+        leeder_file = tmp_path / f"test_leeder_{i}.dat"
+        leeder_file.write_bytes(modified_metadata + b"\xff" * 2000 + image.tobytes())
+        files.append(leeder_file)
     return files
 
 
 @pytest.fixture
-def desp_readers(desp_files):
-    """Create DESP readers from multiple raw files."""
-    return read_files(desp_files, UViewReader)
+def leeder_readers(leeder_files):
+    """Create LEEDER readers from multiple raw files."""
+    return read_files(leeder_files, UViewReader)
 
 
 @pytest.fixture

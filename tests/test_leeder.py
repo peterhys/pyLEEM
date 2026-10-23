@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from pyleem.analysis.desp import (
-    DESPAnalyzer,
-    DESPCalibration,
+from pyleem.analysis.leeder import (
+    LEEDERAnalyzer,
+    LEEDERCalibration,
     disk_kernel,
     eval_radii,
     get_radius,
@@ -162,12 +162,12 @@ class TestEvalRadii:
         assert result[3] == pytest.approx(20, abs=1e-6)
 
 
-class TestDESPCalibration:
-    """Test DESPCalibration class."""
+class TestLEEDERCalibration:
+    """Test LEEDERCalibration class."""
 
-    def test_analyze(self, desp_readers, parabola_func):
-        """Test calibration uses old DESP fit parameters."""
-        calibration = DESPCalibration(desp_readers)
+    def test_analyze(self, leeder_readers, parabola_func):
+        """Test calibration uses old LEEDER fit parameters."""
+        calibration = LEEDERCalibration(leeder_readers)
 
         result = calibration.analyze(window=None)
         params = result["parabola_params"]
@@ -182,11 +182,11 @@ class TestDESPCalibration:
         assert parabola_func(50, **params) == pytest.approx(30, rel=0.1)
         assert result["fit_result"].best_values == params
 
-    def test_metadata_override(self, desp_readers, parabola_func):
+    def test_metadata_override(self, leeder_readers, parabola_func):
         """Test metadata values can force old override parameters."""
-        for reader, voltage in zip(desp_readers, [10, 34, 74]):
+        for reader, voltage in zip(leeder_readers, [10, 34, 74]):
             reader.metadata["Start Voltage"] = [voltage]
-        calibration = DESPCalibration(desp_readers)
+        calibration = LEEDERCalibration(leeder_readers)
 
         result = calibration.analyze(window=None)
         params = result["parabola_params"]
@@ -197,11 +197,11 @@ class TestDESPCalibration:
         assert parabola_func(50, **params) == pytest.approx(52, rel=0.1)
         assert parabola_func(70, **params) == pytest.approx(100, rel=0.1)
 
-    def test_window(self, desp_readers, parabola_func):
+    def test_window(self, leeder_readers, parabola_func):
         """Test window removes the old outlier calibration point."""
-        for reader, voltage in zip(desp_readers, [10, 34, 104]):
+        for reader, voltage in zip(leeder_readers, [10, 34, 104]):
             reader.metadata["Start Voltage"] = [voltage]
-        calibration = DESPCalibration(desp_readers)
+        calibration = LEEDERCalibration(leeder_readers)
 
         result = calibration.analyze(window=np.array([True, True, False]))
         params = result["parabola_params"]
@@ -214,27 +214,27 @@ class TestDESPCalibration:
 
     def test_save_keys(self):
         """Test calibration saves only parabola parameters."""
-        assert DESPCalibration.save_keys == ("parabola_params",)
+        assert LEEDERCalibration.save_keys == ("parabola_params",)
 
 
-class TestDESPAnalyzer:
-    """Test DESPAnalyzer class."""
+class TestLEEDERAnalyzer:
+    """Test LEEDERAnalyzer class."""
 
     @pytest.fixture
-    def desp_analyzer(self, desp_readers):
-        """Test fixture creates a DESPAnalyzer instance."""
-        return DESPAnalyzer(desp_readers, parabola_params={"a": 0.01, "c": 5})
+    def leeder_analyzer(self, leeder_readers):
+        """Test fixture creates a LEEDERAnalyzer instance."""
+        return LEEDERAnalyzer(leeder_readers, parabola_params={"a": 0.01, "c": 5})
 
-    def test_init(self, desp_analyzer):
+    def test_init(self, leeder_analyzer):
         """Test analyzer initialization."""
-        assert desp_analyzer.x_array == pytest.approx([64, 64, 64], abs=1)
-        assert desp_analyzer.y_array == pytest.approx([128, 128, 128], abs=1)
-        assert desp_analyzer.radii_array == pytest.approx([20, 40, 60], rel=0.1)
-        assert desp_analyzer.energy_array == pytest.approx([9, 21, 41], rel=0.1)
+        assert leeder_analyzer.x_array == pytest.approx([64, 64, 64], abs=1)
+        assert leeder_analyzer.y_array == pytest.approx([128, 128, 128], abs=1)
+        assert leeder_analyzer.radii_array == pytest.approx([20, 40, 60], rel=0.1)
+        assert leeder_analyzer.energy_array == pytest.approx([9, 21, 41], rel=0.1)
 
-    def test_processed_image(self, desp_analyzer):
+    def test_processed_image(self, leeder_analyzer):
         """Test processed image method."""
-        image = desp_analyzer.get_processed_image(1)
+        image = leeder_analyzer.get_processed_image(1)
 
         assert isinstance(image, np.ndarray)
         assert image.shape == (256, 128)
@@ -245,16 +245,16 @@ class TestDESPAnalyzer:
     @pytest.mark.parametrize(
         "radius, energy", [(30, 14), (35, 17.25), (40, 21), (45, 25.25), (50, 30)]
     )
-    def test_convert_to_energy(self, desp_analyzer, radius, energy):
+    def test_convert_to_energy(self, leeder_analyzer, radius, energy):
         """Test radius to energy conversion."""
-        assert desp_analyzer.convert_to_energy(radius) == pytest.approx(energy)
+        assert leeder_analyzer.convert_to_energy(radius) == pytest.approx(energy)
 
-    def test_annotate_image(self, desp_analyzer):
+    def test_annotate_image(self, leeder_analyzer):
         """Test annotate image draws circle and label."""
         fig, ax = plt.subplots()
 
         try:
-            result = desp_analyzer.annotate_image(1, ax)
+            result = leeder_analyzer.annotate_image(1, ax)
             text = ax.texts[0].get_text()
 
             assert result is ax
@@ -267,12 +267,12 @@ class TestDESPAnalyzer:
         finally:
             plt.close(fig)
 
-    def test_plot_energy(self, desp_analyzer):
+    def test_plot_energy(self, leeder_analyzer):
         """Test plot energy draws energy over time."""
         fig, ax = plt.subplots()
 
         try:
-            result = desp_analyzer.plot_energy(ax)
+            result = leeder_analyzer.plot_energy(ax)
 
             assert result is ax
             assert len(ax.lines) == 1

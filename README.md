@@ -31,7 +31,7 @@ pip install -e .
 pyLEEM is a Python toolkit for analyzing Low Energy Electron Microscopy (LEEM) data.
 It provides tools for reading LEEM metadata and raw data, and for calibrating and
 analyzing X-ray Photoelectron Spectroscopy (XPS), Secondary Electron Energy
-Spectroscopy (SEES), Diffuse Elastic Scattering Pattern (DESP), and X-ray
+Spectroscopy (SEES), LEED Ewald radius analysis (LEEDER), and X-ray
 Absorption Spectroscopy (XAS).
 
 Additional tools include stitching that can create a continuous spectrum from overlapping spectra.
@@ -60,7 +60,7 @@ The basic `Analyzer` class provides simple analysis tools for raw data.
 For domain-specific analysis, `Analyzer` subclasses can be created. Currently, the
 available subclasses are:
 - `SEESAnalyzer`: Secondary Electron Energy Spectroscopy (SEES) analyzer.
-- `DESPAnalyzer`: Diffuse Elastic Scattering Pattern (DESP) analyzer.
+- `LEEDERAnalyzer`: LEED Ewald radius analysis (LEEDER) analyzer.
 - `XASAnalyzer`: X-ray Absorption Spectroscopy (XAS) analyzer.
 - `XPSAnalyzer`: X-ray Photoelectron Spectroscopy (XPS) analyzer.
 

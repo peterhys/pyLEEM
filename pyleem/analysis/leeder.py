@@ -1,3 +1,5 @@
+"""LEED Ewald radius analysis (LEEDER)."""
+
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 def preprocess_image(
     image, gaussian_kernel=3, gaussian_sigma=0, use_morph=True, morph_kernel=3
 ):
-    """Preprocess DESP image for disk pattern detection.
+    """Preprocess LEEDER image for disk pattern detection.
 
     Applies Gaussian blur, normalization, Otsu thresholding, and morphological operations.
     The morphological operations are optional.
@@ -42,12 +44,12 @@ def preprocess_image(
 
 
 def get_radius(image):
-    """Detect and measure the disk pattern in a DESP image.
+    """Detect and measure the disk pattern in a LEEDER image.
 
     In this process we assume that there is only one disk pattern in the image.
     Uses contour detection and minimum enclosing circle to determine center and radius.
 
-    :param ndarray image: Preprocessed DESP image (uint8).
+    :param ndarray image: Preprocessed LEEDER image (uint8).
     :return: Disk center (x, y) and radius in pixels.
     :rtype: tuple(float, float, float)
     """
@@ -157,8 +159,8 @@ def get_radius_convolve(
     return x, y, r
 
 
-class DESPAnalyzerBase(Analyzer):
-    """Base class for DESP analyzer."""
+class LEEDERAnalyzerBase(Analyzer):
+    """Base class for LEED Ewald radius analysis (LEEDER)."""
 
     def __init__(
         self,
@@ -194,8 +196,8 @@ class DESPAnalyzerBase(Analyzer):
         return partial(model_func, **params)
 
 
-class DESPCalibration(DESPAnalyzerBase):
-    """Calibration analyzer for DESP patterns."""
+class LEEDERCalibration(LEEDERAnalyzerBase):
+    """Calibration analyzer for LEEDER patterns."""
 
     save_keys = ("parabola_params",)
 
@@ -231,10 +233,10 @@ class DESPCalibration(DESPAnalyzerBase):
         }
 
 
-class DESPAnalyzer(DESPAnalyzerBase):
-    """Analyzer for amorphous DESP patterns.
+class LEEDERAnalyzer(LEEDERAnalyzerBase):
+    """Analyzer for amorphous LEEDER patterns.
 
-    Analyzes DESP micrographs to detect circular diffraction patterns
+    Analyzes LEEDER micrographs to detect circular diffraction patterns
     and measure charging effects through pattern radius changes.
 
     :param list readers: List of readers.
@@ -265,7 +267,7 @@ class DESPAnalyzer(DESPAnalyzerBase):
             self.energy_array.append(self.convert_to_energy(r))
 
     def annotate_image(self, index, ax):
-        """Annotate DESP radius and energy on an image axes."""
+        """Annotate LEEDER radius and energy on an image axes."""
         x = self.x_array[index]
         y = self.y_array[index]
         radius = self.radii_array[index]
